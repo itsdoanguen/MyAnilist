@@ -4,9 +4,8 @@ from django.utils import timezone
 
 
 class User(AbstractUser):
-    user_id = models.AutoField(primary_key=True)
+    # Loại bỏ user_id và sử dụng id mặc định từ AbstractUser
     email = models.EmailField(unique=True)
-    hashpassword = models.CharField(max_length=255)
     email_verified = models.BooleanField(default=False)
     date_join = models.DateTimeField(default=timezone.now)
     
