@@ -33,25 +33,19 @@ class UserService:
         # Validate required fields
         self._validate_registration_data(user_data)
         
-        # Check if email already exists
         if self.user_repository.email_exists(user_data['email']):
             raise ValidationError("Email already exists")
         
-        # Check if username already exists
         if self.user_repository.username_exists(user_data['username']):
             raise ValidationError("Username already exists")
         
-        # Validate password strength
         try:
             validate_password(user_data['password'])
         except ValidationError as e:
             raise ValidationError(f"Password validation failed: {', '.join(e.messages)}")
         
-        # Create user through repository
         try:
             user = self.user_repository.create_user(user_data)
-            
-            # Generate JWT tokens
             tokens = self._generate_tokens(user)
             
             return user, tokens
@@ -71,17 +65,14 @@ class UserService:
         """
         required_fields = ['username', 'email', 'password']
         
-        # Check required fields
         for field in required_fields:
             if field not in user_data or not user_data[field]:
                 raise ValidationError(f"{field} is required")
         
-        # Validate email format (basic check)
         email = user_data['email']
         if '@' not in email or '.' not in email.split('@')[-1]:
             raise ValidationError("Invalid email format")
         
-        # Validate username (no spaces, minimum length)
         username = user_data['username']
         if len(username) < 3:
             raise ValidationError("Username must be at least 3 characters long")
@@ -89,7 +80,6 @@ class UserService:
         if ' ' in username:
             raise ValidationError("Username cannot contain spaces")
         
-        # Validate password minimum length
         password = user_data['password']
         if len(password) < 8:
             raise ValidationError("Password must be at least 8 characters long")

@@ -11,7 +11,6 @@ class MailService:
 	"""Simple mail service to send verification emails."""
 
 	def __init__(self):
-		# FRONTEND_URL can be set in environment to build verification link
 		self.frontend_url = getattr(settings, 'FRONT_END_URL', None) or getattr(settings, 'FRONTEND_URL', None) or 'http://localhost:3000'
 
 	def send_verification_email(self, user, token: str) -> bool:
@@ -21,8 +20,6 @@ class MailService:
 		"""
 		try:
 			subject = 'Verify your MyAnilist account'
-			# Build a link to the backend verify endpoint; include token as query param
-			# Prefer frontend URL if provided (so user experience can be on frontend), otherwise point to backend verify endpoint
 			frontend_verify = f"{self.frontend_url}/verify-email?token={token}"
 
 			# Fallback to backend path

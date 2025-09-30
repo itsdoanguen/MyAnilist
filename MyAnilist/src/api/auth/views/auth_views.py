@@ -57,14 +57,10 @@ def register(request):
                 'details': serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Extract validated data
         validated_data = serializer.validated_data
-        # Remove confirm_password as it's not needed for user creation
         validated_data.pop('confirm_password', None)
         
-        # Use service layer for business logic and ensure DB operations are atomic
         user_service = UserService()
-        # Ensure new users are created with email_verified=False
         validated_data['email_verified'] = False
 
         # Wrap creation of user and verification in a transaction so any subsequent
@@ -73,20 +69,16 @@ def register(request):
         with transaction.atomic():
             user, tokens = user_service.register_user(validated_data)
 
-            # Create verification record
             verification = EmailVerification.objects.create(
                 user=user
             )
 
-            # Send verification email (treat failure as fatal so registration fully rolls back)
             mailer = MailService()
             mail_sent = mailer.send_verification_email(user, verification.token)
 
             if not mail_sent:
-                # Raise an exception to trigger rollback and return a 500 to the client.
                 raise Exception("Failed to send verification email")
 
-        # Use serializer to format response
         user_data = UserSerializer(user).data
 
         logger.info(f"User registered successfully: {user.email}")
@@ -99,7 +91,6 @@ def register(request):
         if not mail_sent:
             resp['warning'] = 'Failed to send verification email. Contact support.'
 
-        # Do NOT return tokens until email is verified
         return Response(resp, status=status.HTTP_201_CREATED)
         
     except ValidationError as e:
@@ -161,7 +152,6 @@ def login(request):
                 'details': serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Get authenticated user from serializer
         user = serializer.validated_data['user']
 
         # block login if email not verified
@@ -177,7 +167,7 @@ def login(request):
         
         # Format user data
         user_data = UserSerializer(user).data
-        
+
         logger.info(f"User logged in successfully: {user.email}")
         
         return Response({
