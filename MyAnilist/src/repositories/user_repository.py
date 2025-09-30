@@ -27,14 +27,12 @@ class UserRepository:
             IntegrityError: If email already exists
         """
         try:
-            # Use Django's create_user method which handles password hashing
             user = User.objects.create_user(
                 email=user_data['email'],
                 username=user_data['username'],
                 password=user_data['password']
             )
             
-            # Set additional fields if provided
             if 'email_verified' in user_data:
                 user.email_verified = user_data['email_verified']
                 user.save()

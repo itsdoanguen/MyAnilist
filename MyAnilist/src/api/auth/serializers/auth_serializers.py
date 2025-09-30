@@ -12,8 +12,8 @@ class UserSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'email_verified', 'date_join']
-        read_only_fields = ['id', 'date_join']
+        fields = ['id', 'username', 'email', 'email_verified', 'date_joined']
+        read_only_fields = ['id', 'date_joined']
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -127,35 +127,9 @@ class UserLoginSerializer(serializers.Serializer):
         
         if not user.is_active:
             raise serializers.ValidationError("User account is disabled.")
+
+        if not user.email_verified:
+            raise serializers.ValidationError("Email is not verified.")
         
         attrs['user'] = user
         return attrs
-
-
-class PasswordChangeSerializer(serializers.Serializer):
-    """
-    Serializer for changing password
-    """
-    old_password = serializers.CharField(required=True, write_only=True)
-    new_password = serializers.CharField(
-        required=True, 
-        write_only=True,
-        validators=[validate_password]
-    )
-    confirm_new_password = serializers.CharField(required=True, write_only=True)
-
-    def validate(self, attrs):
-        if attrs['new_password'] != attrs['confirm_new_password']:
-            raise serializers.ValidationError({
-                'confirm_new_password': "New passwords do not match."
-            })
-        return attrs
-
-    def validate_old_password(self, value):
-        """
-        Validate old password
-        """
-        user = self.context['request'].user
-        if not user.check_password(value):
-            raise serializers.ValidationError("Old password is incorrect.")
-        return value

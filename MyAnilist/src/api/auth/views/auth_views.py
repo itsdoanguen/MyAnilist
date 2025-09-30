@@ -8,6 +8,11 @@ import logging
 
 from ..serializers.auth_serializers import UserRegistrationSerializer, UserLoginSerializer, UserSerializer
 from src.services.user_service import UserService
+from src.services.mail_service import MailService
+from src.models.email_verification import EmailVerification
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.db import transaction
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -57,20 +62,45 @@ def register(request):
         # Remove confirm_password as it's not needed for user creation
         validated_data.pop('confirm_password', None)
         
-        # Use service layer for business logic
+        # Use service layer for business logic and ensure DB operations are atomic
         user_service = UserService()
-        user, tokens = user_service.register_user(validated_data)
-        
+        # Ensure new users are created with email_verified=False
+        validated_data['email_verified'] = False
+
+        # Wrap creation of user and verification in a transaction so any subsequent
+        # error (including mail send failure if we choose to treat it as fatal)
+        # will rollback and not leave a partial user row in the database.
+        with transaction.atomic():
+            user, tokens = user_service.register_user(validated_data)
+
+            # Create verification record
+            verification = EmailVerification.objects.create(
+                user=user
+            )
+
+            # Send verification email (treat failure as fatal so registration fully rolls back)
+            mailer = MailService()
+            mail_sent = mailer.send_verification_email(user, verification.token)
+
+            if not mail_sent:
+                # Raise an exception to trigger rollback and return a 500 to the client.
+                raise Exception("Failed to send verification email")
+
         # Use serializer to format response
         user_data = UserSerializer(user).data
-        
+
         logger.info(f"User registered successfully: {user.email}")
-        
-        return Response({
-            'message': 'User registered successfully',
+
+        resp = {
+            'message': 'User registered successfully. Please check your email to verify your account.',
             'user': user_data,
-            'tokens': tokens
-        }, status=status.HTTP_201_CREATED)
+        }
+
+        if not mail_sent:
+            resp['warning'] = 'Failed to send verification email. Contact support.'
+
+        # Do NOT return tokens until email is verified
+        return Response(resp, status=status.HTTP_201_CREATED)
         
     except ValidationError as e:
         logger.warning(f"Registration validation error: {str(e)}")
@@ -133,6 +163,13 @@ def login(request):
         
         # Get authenticated user from serializer
         user = serializer.validated_data['user']
+
+        # block login if email not verified
+        if not getattr(user, 'email_verified', False):
+            return Response({
+                'error': 'Email not verified',
+                'details': {'non_field_errors': ['Please verify your email before logging in.']}
+            }, status=status.HTTP_403_FORBIDDEN)
         
         # Generate tokens using service
         user_service = UserService()
@@ -155,3 +192,36 @@ def login(request):
             'error': 'Internal server error',
             'details': {'non_field_errors': ['Something went wrong. Please try again.']}
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def verify_email(request):
+    """Verify email using token passed as query parameter 'token'"""
+    token = request.query_params.get('token')
+    if not token:
+        return Response({
+            'error': 'Token missing'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    verification = EmailVerification.objects.filter(token=token).first()
+    if not verification:
+        return Response({
+            'error': 'Invalid or expired token'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    if verification.is_expired():
+        return Response({
+            'error': 'Token expired'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Mark user as verified
+    user = verification.user
+    user.email_verified = True
+    user.save()
+
+    # Optionally, delete or deactivate token
+    verification.delete()
+
+    return Response({'message': 'Email verified successfully'}, status=status.HTTP_200_OK)
