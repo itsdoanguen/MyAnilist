@@ -1,21 +1,34 @@
 ANIME_INFO_QS = '''
 query ($id: Int) {
-    Media(id: $id, type: ANIME) {
-      id
-      title { romaji english }
-      startDate { year month day }
-      endDate { year month day }
-      coverImage { large }
-      bannerImage
-      format
-      status
-      episodes
-      season
-      description
-      averageScore
-      genres
-      nextAiringEpisode { airingAt timeUntilAiring episode }
-    }
+  Media(id: $id, type: ANIME) {
+    id
+    idMal
+    siteUrl
+    title { romaji english native }
+    synonyms
+    format
+    episodes
+    duration
+    status
+    startDate { year month day }
+    endDate { year month day }
+    season
+    seasonYear
+    coverImage { large }
+    bannerImage
+    description
+    averageScore
+    meanScore
+    popularity
+    favourites
+    genres
+    tags { id name }
+    source
+    hashtag
+    studios { nodes { id name } }
+    trailer { id site thumbnail }
+    nextAiringEpisode { airingAt timeUntilAiring episode }
+  }
 }
 '''
 
@@ -79,6 +92,30 @@ query ($genres: [String], $season: MediaSeason, $seasonYear: Int, $format: Media
       isAdult
       nextAiringEpisode { airingAt timeUntilAiring episode }
       trending
+    }
+  }
+}
+'''
+
+
+ANIME_CHARACTERS_QS = '''
+query ($id: Int, $page: Int, $perpage: Int) {
+  Media(id: $id) {
+    characters(page: $page, perPage: $perpage) {
+      edges {
+        node {
+          id
+          name { full native }
+          image { large }
+        }
+        role
+        voiceActors {
+          id
+          name { full native }
+          image { large }
+          language
+        }
+      }
     }
   }
 }

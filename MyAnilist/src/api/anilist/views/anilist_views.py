@@ -12,54 +12,47 @@ service = AnilistService()
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-def anime(request):
-	"""Retrieve anime information from AniList GraphQL API.
+def anime(request, anime_id):
+	"""Retrieve anime information by AniList ID and return basic details plus a short character list.
 
-	Query parameters:
-	- id: integer AniList ID (preferred)
-	- q: search string to lookup by name
-	- manual: if 'true' and using search, return list of candidates instead of selecting first
+	Path parameter:
+	- anime_id: integer AniList ID
 
+	Response: {
+	  'anime': { ... parsed media ... },
+	  'characters': [ up to 6 characters, MAIN first then SUPPORTING ]
+	}
 	"""
-	ani_id = request.query_params.get('id')
-	q = request.query_params.get('q')
-	manual = request.query_params.get('manual', 'false').lower() == 'true'
-
 	try:
-		if ani_id:
-			try:
-				ani_id_val = int(ani_id)
-			except ValueError:
-				return Response({'error': 'id must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+		ani_id_val = int(anime_id)
+	except (TypeError, ValueError):
+		return Response({'error': 'anime_id must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
 
-			try:
-				result = service.get_by_id(ani_id_val)
-				return Response(result, status=status.HTTP_200_OK)
-			except LookupError:
-				return Response({'error': 'Anime not found'}, status=status.HTTP_404_NOT_FOUND)
-			except Exception as e:
-				logger.exception('Error fetching anime by id: %s', e)
-				return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
-
-		elif q:
-			try:
-				if manual:
-					candidates = service.search_candidates(q, page=1, perpage=10)
-					return Response({'candidates': candidates}, status=status.HTTP_200_OK)
-				result = service.search_and_get_first(q)
-				return Response(result, status=status.HTTP_200_OK)
-			except LookupError:
-				return Response({'error': 'No search results'}, status=status.HTTP_404_NOT_FOUND)
-			except Exception as e:
-				logger.exception('Error during search: %s', e)
-				return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
-
-		else:
-			return Response({'error': 'Provide either id or q (search) parameter'}, status=status.HTTP_400_BAD_REQUEST)
-
+	# fetch anime details
+	try:
+		anime_detail = service.get_by_id(ani_id_val)
+	except LookupError:
+		return Response({'error': 'Anime not found'}, status=status.HTTP_404_NOT_FOUND)
 	except Exception as e:
-		logger.exception(f"Unexpected error in anilist.anime view: {e}")
-		return Response({'error': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+		logger.exception('Error fetching anime by id: %s', e)
+		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
+
+	# fetch a larger character page and then pick up to 6 prioritizing MAIN roles
+	try:
+		chars = service.get_characters_by_anime_id(ani_id_val, page=1, perpage=20)
+	except Exception:
+		logger.exception('Error fetching characters for anime id %s', ani_id_val)
+		chars = []
+
+	mains = [c for c in chars if (c.get('role') or '').upper() == 'MAIN']
+	supporting = [c for c in chars if (c.get('role') or '').upper() != 'MAIN']
+
+	selected = mains[:6]
+	if len(selected) < 6:
+		need = 6 - len(selected)
+		selected.extend(supporting[:need])
+
+	return Response({'anime': anime_detail, 'characters': selected}, status=status.HTTP_200_OK)
 
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
@@ -161,3 +154,34 @@ def trending_anime_by_season(request):
 		logger.exception(f"Error fetching trending anime: {e}")
 		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def anime_characters(request, anime_id):
+	"""Fetch characters for a given anime ID from AniList."""
+	try:
+		ani_id_val = int(anime_id)
+	except ValueError:
+		return Response({'error': 'anime_id must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+	# pagination
+	page = request.query_params.get('page')
+	perpage = request.query_params.get('perpage')
+	language = request.query_params.get('language') or "JAPANESE"
+
+	try:
+		page_val = int(page) if page else 1
+	except ValueError:
+		return Response({'error': 'page must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+	try:
+		perpage_val = int(perpage) if perpage else 10
+	except ValueError:
+		return Response({'error': 'perpage must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+	try:
+		characters = service.get_characters_by_anime_id(ani_id_val, language=language, page=page_val, perpage=perpage_val)
+		return Response({'characters': characters}, status=status.HTTP_200_OK)
+	except LookupError:
+		return Response({'error': 'Anime not found'}, status=status.HTTP_404_NOT_FOUND)
+	except Exception as e:
+		logger.exception(f"Error fetching anime characters: {e}")
+		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)

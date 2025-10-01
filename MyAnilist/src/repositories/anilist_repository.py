@@ -2,7 +2,7 @@ import requests
 import logging
 from typing import List, Optional
 
-from .anilist_querys import ANIME_INFO_QS, ANIME_ID_SEARCH_QS, ANIME_SEASON_TREND_QS
+from .anilist_querys import ANIME_CHARACTERS_QS, ANIME_INFO_QS, ANIME_ID_SEARCH_QS, ANIME_SEASON_TREND_QS
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +15,13 @@ class AnilistRepository:
 
 	def fetch_anime_by_id(self, anime_id: int) -> Optional[dict]:
 		payload = {'query': ANIME_INFO_QS, 'variables': {'id': anime_id}}
-		resp = requests.post(self.ANILIST_ENDPOINT, json=payload, timeout=10)
-		resp.raise_for_status()
+		try:
+			resp = requests.post(self.ANILIST_ENDPOINT, json=payload, timeout=10)
+			resp.raise_for_status()
+		except requests.exceptions.HTTPError as e:
+			body = e.response.text if getattr(e, 'response', None) is not None else str(e)
+			logger.debug('AniList fetch_anime_by_id failed: status=%s body=%s', getattr(e.response, 'status_code', None), body)
+			raise RuntimeError(body)
 		data = resp.json()
 		if 'errors' in data:
 			logger.debug('AniList returned errors: %s', data['errors'])
@@ -80,3 +85,21 @@ class AnilistRepository:
 		logger.debug('fetch_media_by_criteria returned %d media items', len(media) if media is not None else 0)
 
 		return media
+
+	def fetch_characters_by_anime_id(self, anime_id: int, language: str = "JAPANESE", page: int = 1, perpage: int = 10) -> List[dict]:
+		payload = {'query': ANIME_CHARACTERS_QS, 'variables': {'id': anime_id, 'page': page, 'perpage': perpage, 'language': language}}
+		try:
+			resp = requests.post(self.ANILIST_ENDPOINT, json=payload, timeout=10)
+			resp.raise_for_status()
+		except requests.exceptions.HTTPError as e:
+			# log full response body for debugging
+			body = e.response.text if getattr(e, 'response', None) is not None else str(e)
+			logger.debug('AniList characters query failed: status=%s body=%s', getattr(e.response, 'status_code', None), body)
+			raise RuntimeError(body)
+
+		data = resp.json()
+		if 'errors' in data:
+			logger.debug('AniList returned errors: %s', data['errors'])
+			raise RuntimeError(data['errors'])
+
+		return data.get('data', {}).get('Media', {}).get('characters', {}).get('edges', [])
