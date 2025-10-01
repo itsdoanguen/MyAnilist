@@ -20,53 +20,6 @@ def anime(request):
 	- q: search string to lookup by name
 	- manual: if 'true' and using search, return list of candidates instead of selecting first
 
-	Example responses (JSON):
-
-	1) GET by id (success)
-	{
-		"id": 9253,
-		"name_romaji": "Kimi no Na wa.",
-		"name_english": "Your Name.",
-		"starting_time": "8/26/2016",
-		"ending_time": "10/1/2016",
-		"cover_image": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx9253-abc123.jpg",
-		"banner_image": "https://s4.anilist.co/file/anilistcdn/media/anime/banner/9253.jpg",
-		"airing_format": "MOVIE",
-		"airing_status": "FINISHED",
-		"airing_episodes": 1,
-		"season": "SUMMER",
-		"desc": "A brief HTML/Markdown description...",
-		"average_score": 88,
-		"genres": ["Romance", "Supernatural"],
-		"next_airing_ep": null
-	}
-
-	2) GET by search (auto-select first result)
-	{
-		"id": 20,
-		"name_romaji": "Naruto",
-		"name_english": null,
-		"starting_time": "10/3/2002",
-		"ending_time": "2/8/2007",
-		"cover_image": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx20.jpg",
-		"banner_image": null,
-		"airing_format": "TV",
-		"airing_status": "FINISHED",
-		"airing_episodes": 220,
-		"season": "FALL",
-		"desc": "Long description...",
-		"average_score": 72,
-		"genres": ["Action", "Adventure"],
-		"next_airing_ep": null
-	}
-
-	3) GET by search (manual=true) returns candidates list
-	{
-		"candidates": [
-			{"id": 20, "romaji": "Naruto", "english": null, "cover": "...", "average_score": 72, "episodes": 220, "season": "FALL"},
-			{"id": 1735, "romaji": "Naruto: Shippuuden", "english": null, "cover": "...", "average_score": 78, "episodes": 500, "season": "WINTER"}
-		]
-	}
 	"""
 	ani_id = request.query_params.get('id')
 	q = request.query_params.get('q')
@@ -108,14 +61,51 @@ def anime(request):
 		logger.exception(f"Unexpected error in anilist.anime view: {e}")
 		return Response({'error': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def anime_search(request):
+	""" 
+		Search for anime by criteria. Include Genres, Year, Season, Format, Status
+		Season should be one of: SPRING, SUMMER, FALL, WINTER
+		Format should be one of: TV_SHOW, TV_SHORT, MOVIE, SPECIAL, OVA, ONA, MUSIC
+		Status should be one of: AIRING, FINISHED, NOT_YET_RELEASE, CANCELLED
+		Sort should be one of: POPULARITY_DESC, TITLE_ROMAJI, SCORE_DESC, TRENDING_DESC, etc
+	"""
+	if request.method == 'GET':
+		genres = request.query_params.getlist('genres') or None
+		year = request.query_params.get('year') or None
+		season = request.query_params.get('season') or None
+		media_format = request.query_params.get('format') or None
+		media_status = request.query_params.get('status') or None
+		sort = request.query_params.get('sort') or None
+	else:
+		body = request.data or {}
+		genres = body.get('genres', [])
+		year = body.get('year')
+		season = body.get('season')
+		media_format = body.get('format')
+		media_status = body.get('status')
+		sort = body.get('sort')
+
+	try:
+		try:
+			year_val = int(year) if year else None
+		except (TypeError, ValueError):
+			return Response({'error': 'year must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+		logger.debug('anime_search called with genres=%s year=%s season=%s format=%s status=%s page=%s perpage=%s sort=%s', genres, year_val, season, media_format, media_status, request.query_params.get('page'), request.query_params.get('perpage'), sort)
+
+		results = service.search_by_criteria(genres=genres, year=year_val, season=season, format=media_format, status=media_status, sort=sort)
+		return Response(results, status=status.HTTP_200_OK)
+	except Exception as e:
+		logger.exception(f"Error during anime search: {e}")
+		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def anime_by_name(request):
 	"""POST endpoint that accepts JSON body {"name": "...", "manual": true|false}
 
-	Returns the same payloads as the GET search flow. This is convenient for clients that prefer
-	sending POST bodies rather than query params.
 	"""
 	body = request.data or {}
 	name = body.get('name')
@@ -137,4 +127,37 @@ def anime_by_name(request):
 	except Exception as e:
 		logger.exception(f"Unexpected error in anilist.anime_by_name view: {e}")
 		return Response({'error': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def trending_anime_by_season(request):
+	"""Fetch trending anime from AniList."""
+
+	season = request.query_params.get('season')  # e.g. SPRING, SUMMER, FALL, WINTER
+	year = request.query_params.get('year')
+	page = request.query_params.get('page')
+	perpage = request.query_params.get('perpage')
+
+	# parse ints with fallbacks
+	try:
+		year_val = int(year) if year else None
+	except ValueError:
+		return Response({'error': 'year must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+	try:
+		page_val = int(page) if page else 1
+	except ValueError:
+		return Response({'error': 'page must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+	try:
+		perpage_val = int(perpage) if perpage else 6
+	except ValueError:
+		return Response({'error': 'perpage must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+	try:
+		trending_anime = service.get_trending_anime_by_season(season=season, season_year=year_val, page=page_val, perpage=perpage_val)
+		return Response({'trending': trending_anime}, status=status.HTTP_200_OK)
+	except Exception as e:
+		logger.exception(f"Error fetching trending anime: {e}")
+		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
 
