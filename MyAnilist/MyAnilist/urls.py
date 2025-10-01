@@ -21,4 +21,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('src.api.auth.urls')),
     path('api/user/', include('src.api.user.urls')),
+    path('api/anilist/', include('src.api.anilist.urls')),
 ]
