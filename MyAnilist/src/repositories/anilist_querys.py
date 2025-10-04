@@ -120,3 +120,21 @@ query ($id: Int, $page: Int, $perpage: Int) {
   }
 }
 '''
+
+
+ANIME_STAFF_QS = '''
+query ($id: Int, $page: Int, $perpage: Int) {
+  Media(id: $id) {
+    staff(page: $page, perPage: $perpage) {
+      edges {
+        node {
+          id
+          name { full native }
+          image { large }
+        }
+        role
+      }
+    }
+  }
+}
+'''

@@ -1,10 +1,16 @@
 from django.urls import path
-from .views.anilist_views import anime, anime_by_name, anime_characters, trending_anime_by_season, anime_search
+from .views.anime_views import anime_detail, anime_overview, anime_characters, anime_staff
+from .views.search_views import search_by_criteria, search_by_name, search_trending
 
 urlpatterns = [
-    path('anime/<int:anime_id>/', anime, name='anilist_anime'),
-    path('anime/<int:anime_id>/characters/', anime_characters, name='anilist_anime_characters'),
-    path('anime/search/', anime_search, name='anilist_anime_search'),
-    path('anime/by-name/', anime_by_name, name='anilist_anime_by_name'),
-    path('anime/trending-by-season/', trending_anime_by_season, name='anilist_trending'),
+    # Anime detail endpoints
+    path('anime/<int:anime_id>/', anime_detail, name='anilist_anime_detail'),           # Basic info 
+    path('anime/<int:anime_id>/overview/', anime_overview, name='anilist_anime_overview'),  # Overview tab
+    path('anime/<int:anime_id>/characters/', anime_characters, name='anilist_anime_characters'),  # Characters tab
+    path('anime/<int:anime_id>/staffs/', anime_staff, name='anilist_anime_staffs'),       # Staff tab
+    
+    # Search endpoints
+    path('search/criteria/', search_by_criteria, name='anilist_search_criteria'),
+    path('search/name/', search_by_name, name='anilist_search_name'),
+    path('search/trending/', search_trending, name='anilist_search_trending'),
 ]

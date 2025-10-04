@@ -2,7 +2,7 @@ import requests
 import logging
 from typing import List, Optional
 
-from .anilist_querys import ANIME_CHARACTERS_QS, ANIME_INFO_QS, ANIME_ID_SEARCH_QS, ANIME_SEASON_TREND_QS
+from .anilist_querys import ANIME_CHARACTERS_QS, ANIME_STAFF_QS, ANIME_INFO_QS, ANIME_ID_SEARCH_QS, ANIME_SEASON_TREND_QS
 
 logger = logging.getLogger(__name__)
 
@@ -103,3 +103,21 @@ class AnilistRepository:
 			raise RuntimeError(data['errors'])
 
 		return data.get('data', {}).get('Media', {}).get('characters', {}).get('edges', [])
+
+	def fetch_staff_by_anime_id(self, anime_id: int, page: int = 1, perpage: int = 10) -> List[dict]:
+		"""Fetch staff for a given anime ID from AniList."""
+		payload = {'query': ANIME_STAFF_QS, 'variables': {'id': anime_id, 'page': page, 'perpage': perpage}}
+		try:
+			resp = requests.post(self.ANILIST_ENDPOINT, json=payload, timeout=10)
+			resp.raise_for_status()
+		except requests.exceptions.HTTPError as e:
+			body = e.response.text if getattr(e, 'response', None) is not None else str(e)
+			logger.debug('AniList staff query failed: status=%s body=%s', getattr(e.response, 'status_code', None), body)
+			raise RuntimeError(body)
+
+		data = resp.json()
+		if 'errors' in data:
+			logger.debug('AniList returned errors: %s', data['errors'])
+			raise RuntimeError(data['errors'])
+
+		return data.get('data', {}).get('Media', {}).get('staff', {}).get('edges', [])
