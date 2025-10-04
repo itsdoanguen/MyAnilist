@@ -242,3 +242,52 @@ class AnimeService:
                 'role': role,
             })
         return result
+
+    def get_stats_by_anime_id(self, anime_id: int) -> dict:
+        """
+        Fetch stats and rankings for a given anime ID.
+
+        Returns:
+        - average_score: average score out of 100
+        - mean_score: mean score out of 100
+        - rankings: list of rankings (ranked, popular, etc.)
+        - score_distribution: distribution of user scores
+        - status_distribution: distribution of user watch statuses
+        """
+        try:
+            stats_data = self.repo.fetch_stats_by_anime_id(anime_id)
+        except Exception:
+            logger.exception('Failed to fetch stats for anime id %s', anime_id)
+            raise
+
+        if not stats_data:
+            raise LookupError('Anime stats not found')
+
+        # Parse rankings
+        rankings = stats_data.get('rankings') or []
+        parsed_rankings = []
+        for r in rankings:
+            parsed_rankings.append({
+                'id': r.get('id'),
+                'rank': r.get('rank'),
+                'type': r.get('type'),  # RATED or POPULAR
+                'format': r.get('format'),
+                'year': r.get('year'),
+                'season': r.get('season'),
+                'all_time': r.get('allTime'),
+                'context': r.get('context'),
+            })
+
+        # Parse stats
+        stats = stats_data.get('stats') or {}
+        score_dist = stats.get('scoreDistribution') or []
+        status_dist = stats.get('statusDistribution') or []
+
+        return {
+            'id': stats_data.get('id'),
+            'average_score': stats_data.get('averageScore'),
+            'mean_score': stats_data.get('meanScore'),
+            'rankings': parsed_rankings,
+            'score_distribution': score_dist,
+            'status_distribution': status_dist,
+        }

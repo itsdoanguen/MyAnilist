@@ -2,7 +2,7 @@ import requests, json
 
 url = "https://graphql.anilist.co"
 query = """
-{ __type(name: "Media") {
+{ __type(name: "Character") {
     fields {
       name
       type {

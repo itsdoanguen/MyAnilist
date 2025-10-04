@@ -164,3 +164,36 @@ def anime_staff(request, anime_id):
 		logger.exception(f"Error fetching anime staff: {e}")
 		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
 
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def anime_stats(request, anime_id):
+	"""
+	Fetch statistics and rankings for a given anime ID (for Stats tab).
+	
+	Path parameter:
+	- anime_id: integer AniList ID
+	
+	Response: {
+	  'id': anime_id,
+	  'average_score': int,
+	  'mean_score': int,
+	  'rankings': [ {id, rank, type, format, year, season, all_time, context} ],
+	  'score_distribution': [ {score, amount} ],
+	  'status_distribution': [ {status, amount} ]
+	}
+	"""
+	try:
+		ani_id_val = int(anime_id)
+	except (TypeError, ValueError):
+		return Response({'error': 'anime_id must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+	try:
+		stats = service.get_stats_by_anime_id(ani_id_val)
+		return Response(stats, status=status.HTTP_200_OK)
+	except LookupError:
+		return Response({'error': 'Anime stats not found'}, status=status.HTTP_404_NOT_FOUND)
+	except Exception as e:
+		logger.exception(f"Error fetching anime stats: {e}")
+		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
+

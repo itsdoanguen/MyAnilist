@@ -138,3 +138,34 @@ query ($id: Int, $page: Int, $perpage: Int) {
   }
 }
 '''
+
+
+ANIME_STATS_QS = '''
+query ($id: Int) {
+  Media(id: $id, type: ANIME) {
+    id
+    averageScore
+    meanScore
+    rankings {
+      id
+      rank
+      type
+      format
+      year
+      season
+      allTime
+      context
+    }
+    stats {
+      scoreDistribution {
+        score
+        amount
+      }
+      statusDistribution {
+        status
+        amount
+      }
+    }
+  }
+}
+'''
