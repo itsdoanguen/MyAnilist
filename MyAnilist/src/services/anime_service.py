@@ -1,5 +1,5 @@
 from typing import List, Optional
-from ..repositories.anilist_repository import AnilistRepository
+from ..repositories.anime_repository import AnimeRepository
 import logging
 
 logger = logging.getLogger(__name__)
@@ -9,7 +9,7 @@ class AnimeService:
     """Service layer for anime-specific operations (detail, characters, etc.)."""
 
     def __init__(self):
-        self.repo = AnilistRepository()
+        self.repo = AnimeRepository()
 
     def _fmt_date(self, d: dict) -> Optional[str]:
         """Format date dictionary to string."""

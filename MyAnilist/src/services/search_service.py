@@ -1,5 +1,6 @@
 from typing import List, Optional
-from ..repositories.anilist_repository import AnilistRepository
+from ..repositories.search_repository import SearchRepository
+from ..repositories.anime_repository import AnimeRepository
 from django.utils import timezone
 import logging
 
@@ -10,7 +11,8 @@ class SearchService:
     """Service layer for search-related operations (criteria, trending, by name, etc.)."""
 
     def __init__(self):
-        self.repo = AnilistRepository()
+        self.repo = SearchRepository()
+        self.anime_repo = AnimeRepository()  # For fetching full anime details
 
     def _fmt_date(self, d: dict) -> Optional[str]:
         """Format date dictionary to string."""
