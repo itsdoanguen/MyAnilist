@@ -291,3 +291,28 @@ class AnimeService:
             'score_distribution': score_dist,
             'status_distribution': status_dist,
         }
+
+    def get_where_to_watch(self, anime_id: int) -> List[dict]:
+        """
+        Fetch streaming links for a given anime ID.
+
+        Returns a list of streaming services. Each service includes:
+        - title, url, site
+        """
+        try:
+            links = self.repo.fetch_where_to_watch(anime_id)
+        except Exception:
+            logger.exception('Failed to fetch where to watch for anime id %s', anime_id)
+            return []
+
+        if not links:
+            return []
+
+        result = []
+        for link in links:
+            result.append({
+                'title': link.get('title'),
+                'url': link.get('url'),
+                'site': link.get('site')
+            })
+        return result

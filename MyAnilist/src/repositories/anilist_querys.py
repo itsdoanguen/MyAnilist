@@ -169,3 +169,16 @@ query ($id: Int) {
   }
 }
 '''
+
+ANIME_WHERE_TO_WATCH_QS = '''
+query ($id: Int) {
+  Media(id: $id, type: ANIME) {
+    id
+    streamingEpisodes {
+      title
+      url
+      site
+    }
+  }
+}
+'''

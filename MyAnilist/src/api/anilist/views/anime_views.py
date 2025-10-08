@@ -197,3 +197,27 @@ def anime_stats(request, anime_id):
 		logger.exception(f"Error fetching anime stats: {e}")
 		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def anime_streaming_links(request, anime_id):
+	"""
+	Fetch streaming links for a given anime ID (for Where to Watch tab).
+	
+	Path parameter:
+	- anime_id: integer AniList ID
+	
+	Response: {
+	  'streaming_links': [ {site, url, type} ]
+	}
+	"""
+	try:
+		ani_id_val = int(anime_id)
+	except (TypeError, ValueError):
+		return Response({'error': 'anime_id must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+	try:
+		streaming_links = service.get_where_to_watch(ani_id_val)
+		return Response({'streaming_links': streaming_links}, status=status.HTTP_200_OK)
+	except Exception as e:
+		logger.exception(f"Error fetching anime streaming links: {e}")
+		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
