@@ -2,6 +2,7 @@ from django.urls import path
 from .views.anime_views import anime_detail, anime_overview, anime_characters, anime_staff, anime_stats, anime_streaming_links
 from .views.search_views import search_by_criteria, search_by_name, search_trending
 from .views.character_views import character_detail
+from .views.staff_views import staff_detail
 
 urlpatterns = [
     # Anime detail endpoints
@@ -14,6 +15,9 @@ urlpatterns = [
 
     # Character endpoints
     path('character/<int:character_id>/', character_detail, name='anilist_character_detail'),
+
+    # Staff endpoints
+    path('staff/<int:staff_id>/', staff_detail, name='anilist_staff_detail'),
 
     # Search endpoints
     path('search/criteria/', search_by_criteria, name='anilist_search_criteria'),

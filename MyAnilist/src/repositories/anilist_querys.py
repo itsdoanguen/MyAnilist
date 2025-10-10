@@ -206,3 +206,36 @@ query ($id: Int) {
   }
 }
 '''
+
+STAFF_INFO_QS = '''
+query ($id: Int) {
+  Staff(id: $id) {
+    id
+    name { full native }
+    image { large }
+    description
+    languageV2
+    gender
+    dateOfBirth { year month day }
+    dateOfDeath { year month day }
+    age
+    yearsActive
+    homeTown
+    bloodType
+    primaryOccupations
+    staffMedia(page: 1, perPage: 25, sort: POPULARITY_DESC) {
+      nodes {
+        id
+        title { romaji english }
+        coverImage { large }
+        type
+        format
+        status
+        episodes
+        season
+        seasonYear
+      }
+    }
+  }
+}
+'''

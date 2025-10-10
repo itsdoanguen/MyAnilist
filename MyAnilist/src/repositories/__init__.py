@@ -8,4 +8,5 @@ __all__ = [
     'AnimeRepository',
     'SearchRepository',
     'CharacterRepository',
+    'StaffRepository',
 ]
