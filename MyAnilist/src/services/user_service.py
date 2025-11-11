@@ -217,3 +217,86 @@ class UserService:
             'limit': int(limit or 50),
             'items': result,
         }
+
+    def get_user_anime_list(self, username: str, requester: User = None):
+        """
+        Return the anime list for a given user grouped by watch_status.
+
+        Response shape:
+        {
+          "watching": [ {...}, ... ],
+          "completed": [ {...}, ... ],
+          "on_hold": [ {...}, ... ],
+          "dropped": [ {...}, ... ],
+          "plan_to_watch": [ {...}, ... ]
+        }
+
+        Each item includes fields from the AnimeFollow model plus a small
+        AniList enrichment (title, cover image, episodes) when available.
+        """
+        user = self.get_user_by_username(username)
+        if not user:
+            raise ValueError('user_not_found')
+
+        from ..repositories.anime_follow_repository import AnimeFollowRepository
+        from ..repositories.anime_repository import AnimeRepository
+
+        follow_repo = AnimeFollowRepository()
+        anime_repo = AnimeRepository()
+
+        follows = follow_repo.get_follows_for_user(user)
+
+        buckets = {
+            'watching': [],
+            'completed': [],
+            'on_hold': [],
+            'dropped': [],
+            'plan_to_watch': [],
+        }
+
+        def enrich(anilist_id: int):
+            try:
+                data = anime_repo.fetch_anime_by_id(anilist_id)
+                if not data:
+                    return {}
+
+                title = data.get('title') or {}
+                cover = (data.get('coverImage') or {}).get('large')
+                return {
+                    'title_romaji': title.get('romaji'),
+                    'title_english': title.get('english'),
+                    'title_native': title.get('native'),
+                    'cover_image': cover,
+                    'episodes': data.get('episodes'),
+                }
+            except Exception:
+                return {}
+
+        for f in follows:
+            item = {
+                'id': f.id,
+                'anilist_id': f.anilist_id,
+                'episode_progress': f.episode_progress,
+                'watch_status': f.watch_status,
+                'is_favorite': f.isFavorite,
+                'notify_email': f.notify_email,
+                'start_date': f.start_date.isoformat() if f.start_date else None,
+                'finish_date': f.finish_date.isoformat() if f.finish_date else None,
+                'total_rewatch': f.total_rewatch,
+                'user_note': f.user_note,
+                'created_at': f.created_at.isoformat() if f.created_at else None,
+                'updated_at': f.updated_at.isoformat() if f.updated_at else None,
+            }
+
+            enrich_data = enrich(f.anilist_id)
+            if enrich_data:
+                item.update(enrich_data)
+
+            bucket = f.watch_status if f.watch_status in buckets else 'plan_to_watch'
+            buckets[bucket].append(item)
+
+        return {
+            'username': username,
+            'counts': {k: len(v) for k, v in buckets.items()},
+            **buckets,
+        }

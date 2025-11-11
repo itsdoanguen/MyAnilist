@@ -80,3 +80,27 @@ def user_activity_list(request, username):
 	except Exception:
 		return Response({'error': 'Error fetching activity list'}, status=status.HTTP_502_BAD_GATEWAY)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def user_anime_list(request, username):
+	"""Return the anime list for a given user with different statuses.
+
+	Response: {
+	  "watching": [ {...}, ... ],
+	  "completed": [ {...}, ... ],
+	  "on_hold": [ {...}, ... ],
+	  "dropped": [ {...}, ... ],
+	  "plan_to_watch": [ {...}, ... ]
+	}
+	"""
+	requester = request.user if request.user and request.user.is_authenticated else None
+
+	try:
+		payload = service.get_user_anime_list(username, requester=requester)
+		return Response(payload, status=status.HTTP_200_OK)
+	except ValueError as e:
+		if str(e) == 'user_not_found':
+			return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+		return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
+	except Exception:
+		return Response({'error': 'Error fetching user anime list'}, status=status.HTTP_502_BAD_GATEWAY)
