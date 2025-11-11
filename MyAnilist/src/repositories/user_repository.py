@@ -75,6 +75,71 @@ class UserRepository:
             return User.objects.get(id=user_id)
         except User.DoesNotExist:
             return None
+
+    @staticmethod
+    def get_user_by_username(username: str) -> Optional[Any]:
+        """
+        Get user by username
+        """
+        try:
+            return User.objects.get(username=username)
+        except User.DoesNotExist:
+            return None
+
+    @staticmethod
+    def get_activity_counts_for_year(user: Any, year: int, include_private: bool = False):
+        """
+        Query UserActivity counts grouped by date for a given user and year.
+
+        Returns a list of dicts: [{ 'day': date, 'count': int }, ...]
+        """
+        from src.models import UserActivity
+        from django.db.models import Count
+        from django.db.models.functions import TruncDate
+
+        start_date = f"{year}-01-01"
+        end_date = f"{year}-12-31"
+
+        qs = UserActivity.objects.filter(user=user, created_at__date__gte=start_date, created_at__date__lte=end_date)
+        if not include_private:
+            qs = qs.filter(is_public=True)
+
+        qs = (
+            qs.annotate(day=TruncDate('created_at'))
+            .values('day')
+            .annotate(count=Count('id'))
+            .order_by('day')
+        )
+
+        return list(qs)
+
+    @staticmethod
+    def get_activities(user: Any, since_days: int = None, limit: int = 50, offset: int = 0, include_private: bool = False):
+        """
+        Retrieve UserActivity instances for a user.
+
+        - since_days: if provided, only return activities newer than now - since_days.
+        - limit/offset: simple pagination.
+        - include_private: whether to include private activities.
+        Returns a list of UserActivity model instances ordered by created_at desc.
+        """
+        from src.models import UserActivity
+        from django.utils import timezone
+        from datetime import timedelta
+
+        qs = UserActivity.objects.filter(user=user)
+        if not include_private:
+            qs = qs.filter(is_public=True)
+
+        if since_days is not None:
+            cutoff = timezone.now() - timedelta(days=int(since_days))
+            qs = qs.filter(created_at__gte=cutoff)
+
+        qs = qs.order_by('-created_at')
+
+        start = int(offset or 0)
+        end = start + int(limit or 50)
+        return list(qs[start:end])
     
     @staticmethod
     def email_exists(email: str) -> bool:

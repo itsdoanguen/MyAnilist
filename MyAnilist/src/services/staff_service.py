@@ -79,7 +79,7 @@ class StaffService:
             'blood_type': staff.get('bloodType'),
             'primary_occupations': staff.get('primaryOccupations') or [],
             'media': media_list,
-            'anime_appearances': anime_appearances[:10],  # Limit to 10 most relevant
+            'anime_appearances': anime_appearances[:20],  
         }
 
     def get_staff_by_id(self, staff_id: int) -> dict:

@@ -123,3 +123,97 @@ class UserService:
             User instance or None
         """
         return self.user_repository.get_user_by_id(user_id)
+
+    def get_user_by_username(self, username: str):
+        """
+        Get user by username through repository
+        """
+        return self.user_repository.get_user_by_username(username)
+
+    def get_activity_overview(self, username: str, year: int = None, requester: User = None):
+        """
+        Build the activity overview payload for the given username and year.
+
+        - If year is None, uses current year.
+        - If requester is the same as the target user, includes private activities.
+        Returns a dict: { 'year': year, 'counts': { 'YYYY-MM-DD': int, ... } }
+        """
+        from datetime import date, datetime, timedelta
+
+        # Resolve user
+        user = self.get_user_by_username(username)
+        if not user:
+            raise ValueError('user_not_found')
+
+        if year is None:
+            year = date.today().year
+
+        include_private = requester is not None and requester.pk == user.pk
+
+        rows = self.user_repository.get_activity_counts_for_year(user, year, include_private=include_private)
+
+        # Build zero-filled mapping for full year
+        start_date = date(year, 1, 1)
+        end_date = date(year, 12, 31)
+        days = {}
+        cur = start_date
+        while cur <= end_date:
+            days[cur.isoformat()] = 0
+            cur = cur + timedelta(days=1)
+
+        for row in rows:
+            d = row.get('day')
+            if isinstance(d, datetime):
+                key = d.date().isoformat()
+            else:
+                key = d.isoformat()
+            days[key] = row.get('count', 0)
+
+        return {'year': year, 'counts': days}
+
+    def get_activity_list(self, username: str, since_days: int = None, limit: int = 50, offset: int = 0, requester: User = None):
+        """
+        Return a paginated list of user activities formatted for the frontend.
+
+        Each item contains: id, action_type, target_type, target_id, metadata, created_at (iso), ago_seconds
+        - since_days: optional integer, limit: page size, offset: start index
+        - requester: if requester is the same as user, include private activities
+        """
+        from django.utils import timezone
+
+        user = self.get_user_by_username(username)
+        if not user:
+            raise ValueError('user_not_found')
+
+        include_private = requester is not None and requester.pk == user.pk
+
+        activities = self.user_repository.get_activities(user, since_days=since_days, limit=limit, offset=offset, include_private=include_private)
+
+        now = timezone.now()
+        result = []
+        for a in activities:
+            try:
+                created = a.created_at
+                ago_seconds = int((now - created).total_seconds()) if created else None
+            except Exception:
+                created = None
+                ago_seconds = None
+
+            result.append({
+                'id': a.id,
+                'action_type': a.action_type,
+                'target_type': a.target_type,
+                'target_id': a.target_id,
+                'metadata': a.metadata,
+                'is_public': a.is_public,
+                'created_at': created.isoformat() if created else None,
+                'ago_seconds': ago_seconds,
+            })
+
+        return {
+            'username': username,
+            'count': len(result),
+            'offset': int(offset or 0),
+            'limit': int(limit or 50),
+            'items': result,
+        }

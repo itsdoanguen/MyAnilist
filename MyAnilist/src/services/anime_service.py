@@ -79,7 +79,6 @@ class AnimeService:
         - characters: top 6 characters (MAIN roles prioritized)
         - staff: top 3 staff (prioritized by role importance)
         """
-        # Fetch characters (fetch more to ensure we get enough MAIN characters)
         try:
             chars_raw = self.repo.fetch_characters_by_anime_id(anime_id, page=1, perpage=20)
             characters = []
@@ -111,11 +110,9 @@ class AnimeService:
                     'voice_actor': voice_actor,
                 })
             
-            # Prioritize MAIN characters first
             mains = [c for c in characters if (c.get('role') or '').upper() == 'MAIN']
             supporting = [c for c in characters if (c.get('role') or '').upper() != 'MAIN']
             
-            # Select up to 6: MAIN first, then SUPPORTING
             selected_chars = mains[:6]
             if len(selected_chars) < 6:
                 need = 6 - len(selected_chars)
@@ -124,7 +121,6 @@ class AnimeService:
             logger.exception('Failed to fetch characters preview for anime id %s', anime_id)
             selected_chars = []
 
-        # Fetch staff (top 3)
         try:
             staff_raw = self.repo.fetch_staff_by_anime_id(anime_id, page=1, perpage=20)
             staff_list = []
