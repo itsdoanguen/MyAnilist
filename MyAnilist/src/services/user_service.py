@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from ..repositories.user_repository import UserRepository
 from ..models.user import User
+from .anime_follow_service import AnimeFollowService
 
 
 class UserService:
@@ -15,6 +16,8 @@ class UserService:
     
     def __init__(self):
         self.user_repository = UserRepository()
+        # delegate follow-related logic to AnimeFollowService
+        self.anime_follow_service = AnimeFollowService()
     
     def register_user(self, user_data: Dict[str, Any]) -> Tuple[User, Dict[str, str]]:
         """
@@ -238,65 +241,12 @@ class UserService:
         if not user:
             raise ValueError('user_not_found')
 
-        from ..repositories.anime_follow_repository import AnimeFollowRepository
-        from ..repositories.anime_repository import AnimeRepository
+        return self.anime_follow_service.get_user_anime_list_for_user(user)
+    
+    def get_user_follow_anime_info(self, user: User, anilist_id: int):
+        """
+        Get the AnimeFollow instance for the given user and anilist_id.
 
-        follow_repo = AnimeFollowRepository()
-        anime_repo = AnimeRepository()
-
-        follows = follow_repo.get_follows_for_user(user)
-
-        buckets = {
-            'watching': [],
-            'completed': [],
-            'on_hold': [],
-            'dropped': [],
-            'plan_to_watch': [],
-        }
-
-        def enrich(anilist_id: int):
-            try:
-                data = anime_repo.fetch_anime_by_id(anilist_id)
-                if not data:
-                    return {}
-
-                title = data.get('title') or {}
-                cover = (data.get('coverImage') or {}).get('large')
-                return {
-                    'title_romaji': title.get('romaji'),
-                    'title_english': title.get('english'),
-                    'title_native': title.get('native'),
-                    'cover_image': cover,
-                    'episodes': data.get('episodes'),
-                }
-            except Exception:
-                return {}
-
-        for f in follows:
-            item = {
-                'id': f.id,
-                'anilist_id': f.anilist_id,
-                'episode_progress': f.episode_progress,
-                'watch_status': f.watch_status,
-                'is_favorite': f.isFavorite,
-                'notify_email': f.notify_email,
-                'start_date': f.start_date.isoformat() if f.start_date else None,
-                'finish_date': f.finish_date.isoformat() if f.finish_date else None,
-                'total_rewatch': f.total_rewatch,
-                'user_note': f.user_note,
-                'created_at': f.created_at.isoformat() if f.created_at else None,
-                'updated_at': f.updated_at.isoformat() if f.updated_at else None,
-            }
-
-            enrich_data = enrich(f.anilist_id)
-            if enrich_data:
-                item.update(enrich_data)
-
-            bucket = f.watch_status if f.watch_status in buckets else 'plan_to_watch'
-            buckets[bucket].append(item)
-
-        return {
-            'username': username,
-            'counts': {k: len(v) for k, v in buckets.items()},
-            **buckets,
-        }
+        Returns None if not found.
+        """
+        return self.anime_follow_service.get_follow(user, anilist_id)

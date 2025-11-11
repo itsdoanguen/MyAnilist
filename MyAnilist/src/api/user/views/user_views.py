@@ -104,3 +104,4 @@ def user_anime_list(request, username):
 		return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
 	except Exception:
 		return Response({'error': 'Error fetching user anime list'}, status=status.HTTP_502_BAD_GATEWAY)
+	

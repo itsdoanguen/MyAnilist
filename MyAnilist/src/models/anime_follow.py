@@ -14,8 +14,8 @@ class AnimeFollow(models.Model):
     
     id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='anime_follows')
-    anilist_id = models.IntegerField()  # ID từ AniList API
-    notify_email = models.BooleanField(default=False)
+    anilist_id = models.IntegerField() 
+    notify_email = models.CharField(max_length=255, default='')
     episode_progress = models.IntegerField(default=0)
     watch_status = models.CharField(max_length=20, choices=WATCH_STATUS_CHOICES, default='plan_to_watch')
     isFavorite = models.BooleanField(default=False)
