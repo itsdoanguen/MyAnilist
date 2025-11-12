@@ -64,6 +64,7 @@ def follow_get(request, anilist_id):
             "updated_at": follow.updated_at.isoformat() if follow.updated_at else None,
             "is_following": True,
         }
+
         return Response(payload, status=status.HTTP_200_OK)
     except Exception as e:
         logger = __import__('logging').getLogger(__name__)
@@ -99,6 +100,12 @@ def follow_create(request, anilist_id):
             "updated_at": follow.updated_at.isoformat() if follow.updated_at else None,
             "is_following": True,
         }
+
+        try:
+            user_service.create_activity(auth_user, 'followed_anime', 'AnimeFollow', follow.anilist_id, {}, is_public=True)
+        except Exception:
+            return Response({'error': 'Error when logging activity'}, status=status.HTTP_502_BAD_GATEWAY)
+
         return Response(payload, status=status.HTTP_201_CREATED)
     except Exception as e:
         logger = __import__('logging').getLogger(__name__)
@@ -135,6 +142,12 @@ def follow_update(request, anilist_id):
             "updated_at": follow.updated_at.isoformat() if follow.updated_at else None,
             "is_following": True,
         }
+
+        try: 
+            user_service.create_activity(auth_user, 'updated_followed_anime', 'AnimeFollow', follow.anilist_id, {}, is_public=True)
+        except Exception:
+            return Response({'error': 'Error when logging activity'}, status=status.HTTP_502_BAD_GATEWAY)
+
         return Response(payload, status=status.HTTP_200_OK)
     except Exception as e:
         logger = __import__('logging').getLogger(__name__)

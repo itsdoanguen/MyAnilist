@@ -221,6 +221,23 @@ class UserService:
             'items': result,
         }
 
+    def create_user_activity(self, user: User, action_type: str, target_type: str = None, target_id: int = None, metadata: Dict[str, Any] = None, is_public: bool = True):
+        """
+        Create a new UserActivity record with the given parameters.
+        """
+        if metadata is None:
+            metadata = {}
+
+        activity = self.user_repository.create_user_activity(
+            user=user,
+            action_type=action_type,
+            target_type=target_type,
+            target_id=target_id,
+            metadata=metadata,
+            is_public=is_public
+        )
+        return activity
+
     def get_user_anime_list(self, username: str, requester: User = None):
         """
         Return the anime list for a given user grouped by watch_status.

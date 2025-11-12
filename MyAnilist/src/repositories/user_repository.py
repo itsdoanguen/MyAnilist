@@ -141,6 +141,34 @@ class UserRepository:
         end = start + int(limit or 50)
         return list(qs[start:end])
     
+
+    @staticmethod
+    def create_user_activity(user: Any, action_type: str, target_type: str = None, target_id: int = None, metadata: Dict[str, Any] = None, is_public: bool = True) -> Any:
+        """
+        Create a new UserActivity record.
+
+        Args:
+            user: User instance performing the action
+            action_type: Type of action (e.g. "followed_anime", "rated")
+            target_type: Optional type of the target object
+            target_id: Optional ID of the target object
+            metadata: Optional additional JSON data
+            is_public: Whether the activity is public
+
+            return UserActivity instance
+        """
+        from src.models import UserActivity
+
+        activity = UserActivity.objects.create(
+            user=user,
+            action_type=action_type,
+            target_type=target_type,
+            target_id=target_id,
+            metadata=metadata or {},
+            is_public=is_public
+        )
+        return activity
+
     @staticmethod
     def email_exists(email: str) -> bool:
         """
