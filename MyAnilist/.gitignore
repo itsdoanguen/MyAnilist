@@ -1,5 +1,6 @@
 .env
 
-/__pycache__
-*.pyc
+# Ignore all __pycache__ directories anywhere in the repo and compiled Python files
+__pycache__/
+*.py[cod]
 *.pyo
