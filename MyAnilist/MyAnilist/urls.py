@@ -23,4 +23,5 @@ urlpatterns = [
     path('api/user/', include('src.api.user.urls')),
     path('api/anilist/', include('src.api.anilist.urls')),
     path('api/follow/', include('src.api.follow.urls')),
+    path('api/list/', include('src.api.list.urls')),
 ]
