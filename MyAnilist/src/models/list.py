@@ -62,3 +62,50 @@ class AnimeList(models.Model):
     
     def __str__(self):
         return f"{self.list.list_name} - AniList ID: {self.anilist_id}"
+
+
+class ListJoinRequest(models.Model):
+    """Model for users requesting to join a list."""
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    request_id = models.AutoField(primary_key=True)
+    list = models.ForeignKey(
+        List, 
+        on_delete=models.CASCADE, 
+        related_name='join_requests'
+    )
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='list_join_requests'
+    )
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='pending'
+    )
+    message = models.TextField(blank=True, default='')  
+    requested_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    responded_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='responded_join_requests'
+    )
+    
+    class Meta:
+        db_table = 'list_join_requests'
+        unique_together = ['list', 'user', 'status']  
+        verbose_name = 'List Join Request'
+        verbose_name_plural = 'List Join Requests'
+        ordering = ['-requested_at']
+    
+    def __str__(self):
+        return f"{self.user.username} -> {self.list.list_name} ({self.status})"

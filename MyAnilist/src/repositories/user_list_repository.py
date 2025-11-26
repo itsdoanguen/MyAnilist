@@ -93,7 +93,7 @@ class UserListRepository:
             return False
 
     @staticmethod
-    def update_member_permissions(user, list_id: int, can_edit: bool) -> Optional:
+    def update_member_permissions(user, list_id: int, can_edit: bool) -> Optional: # type: ignore
         """
         Update member permissions in a list.
 
