@@ -143,6 +143,40 @@ def list_update(request, list_id):
         return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def list_delete(request, list_id):
+    """Delete a list.
+    
+    Path params:
+    - list_id: ID of the list to delete
+    
+    Permission requirements:
+    - User must be the OWNER of the list (is_owner=True)
+    - Members with only can_edit permission cannot delete
+    
+    Note: This will CASCADE delete all related records:
+    - UserList entries (all users associated with this list)
+    - AnimeList entries (all anime items in this list)
+    """
+    try:
+        auth_user = request.user
+        
+        # Delete list with owner permission check
+        list_service.delete_list(user=auth_user, list_id=list_id)
+        
+        return Response({
+            'message': 'List deleted successfully',
+            'list_id': list_id
+        }, status=status.HTTP_200_OK)
+        
+    except ValidationError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception('Error in list_delete: %s', e)
+        return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_get(request, anilist_id):

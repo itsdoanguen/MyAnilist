@@ -163,3 +163,23 @@ class ListRepository:
             return user_list.can_edit
         except UserList.DoesNotExist:
             return False
+    
+    @staticmethod
+    def delete_list(list_id: int) -> bool:
+        """
+        Delete a List instance and all related records.
+
+        Args:
+            list_id: ID of the list to delete
+
+        Returns:
+            True if deleted successfully, False if not found
+        """
+        from src.models.list import List
+
+        try:
+            lst = List.objects.get(list_id=list_id)
+            lst.delete()
+            return True
+        except List.DoesNotExist:
+            return False

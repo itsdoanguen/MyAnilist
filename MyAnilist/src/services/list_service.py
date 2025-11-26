@@ -225,3 +225,38 @@ class ListService:
         except Exception as e:
             logger.exception('Error updating list %s: %s', list_id, e)
             raise
+    
+    def delete_list(self, user, list_id: int) -> bool:
+        """
+        Delete a list. Only the owner can delete.
+
+        Args:
+            user: User attempting to delete
+            list_id: ID of the list to delete
+
+        Returns:
+            True if deleted successfully
+
+        Raises:
+            ValidationError: If permission denied or list not found
+        """
+        # Check if list exists
+        lst = self.repo.get_details_of_list(list_id)
+        if not lst:
+            raise ValidationError('List not found')
+        
+        # Check if user is owner (only owner can delete)
+        is_owner = self.repo.check_user_is_owner(user, list_id)
+        if not is_owner:
+            raise ValidationError('Only the list owner can delete this list')
+        
+        try:
+            deleted = self.repo.delete_list(list_id)
+            
+            if not deleted:
+                raise ValidationError('Failed to delete list')
+            
+            return True
+        except Exception as e:
+            logger.exception('Error deleting list %s: %s', list_id, e)
+            raise

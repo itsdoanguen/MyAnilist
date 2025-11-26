@@ -86,3 +86,43 @@ class ListUpdateSerializer(serializers.Serializer):
         if value is not None and (not value or not value.strip()):
             raise serializers.ValidationError('List name cannot be empty')
         return value.strip() if value else value
+
+
+class MemberAddSerializer(serializers.Serializer):
+    """Serializer for adding a member to a list."""
+    
+    username = serializers.CharField(
+        required=True,
+        trim_whitespace=True,
+        error_messages={
+            'required': 'Username is required',
+            'blank': 'Username cannot be empty'
+        }
+    )
+    
+    can_edit = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text='If True, member can edit the list. If False (default), member can only view.'
+    )
+    
+    def validate_username(self, value):
+        """Validate username is not empty."""
+        if not value or not value.strip():
+            raise serializers.ValidationError('Username cannot be empty')
+        return value.strip()
+
+
+class MemberPermissionUpdateSerializer(serializers.Serializer):
+    """Serializer for updating member permissions."""
+    
+    username = serializers.CharField(
+        required=True,
+        max_length=150,
+        help_text='Username of the member to update'
+    )
+    
+    can_edit = serializers.BooleanField(
+        required=True,
+        help_text='Permission level: True for edit, False for view-only'
+    )
