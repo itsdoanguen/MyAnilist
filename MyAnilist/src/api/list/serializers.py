@@ -126,3 +126,35 @@ class MemberPermissionUpdateSerializer(serializers.Serializer):
         required=True,
         help_text='Permission level: True for edit, False for view-only'
     )
+
+
+class JoinRequestSerializer(serializers.Serializer):
+    """Serializer for creating a join request."""
+    
+    message = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default='',
+        max_length=500,
+        trim_whitespace=True,
+        help_text='Optional message to the list owner'
+    )
+
+
+class JoinRequestRespondSerializer(serializers.Serializer):
+    """Serializer for responding to a join request (approve/reject)."""
+    
+    action = serializers.ChoiceField(
+        choices=['approve', 'reject'],
+        required=True,
+        error_messages={
+            'required': 'Action is required',
+            'invalid_choice': 'Action must be either "approve" or "reject"'
+        }
+    )
+    
+    can_edit = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text='Permission level when approving (ignored for reject). True for edit, False for view-only.'
+    )

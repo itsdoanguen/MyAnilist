@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 
 from src.services.user_list_service import UserListService
 from src.services.user_service import UserService
-from .serializers import MemberAddSerializer, MemberPermissionUpdateSerializer
+from .serializers import MemberAddSerializer, MemberPermissionUpdateSerializer, JoinRequestSerializer, JoinRequestRespondSerializer
 
 user_list_service = UserListService()
 user_service = UserService()
@@ -254,4 +254,172 @@ def member_permission_update(request, list_id):
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception('Error in member_permission_update: %s', e)
+        return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def join_request_create(request, list_id):
+    """Create a join request for a public list.
+    
+    Path params:
+    - list_id: ID of the list to join
+    
+    Body params:
+    - message (optional): Optional message to the list owner
+    
+    Validation rules:
+    - List must exist and be public
+    - User cannot be the owner of the list
+    - User cannot already be a member of the list
+    - User cannot have pending or approved request for this list
+    
+    Example request:
+    POST /api/list/1/request-join/
+    {
+        "message": "cho join voi"
+    }
+    """
+    try:
+        import json
+        
+        user = request.user
+        
+        try:
+            data = request.data
+        except Exception as parse_error:
+            logger.warning(f'Failed to parse request data: {parse_error}')
+            try:
+                data = json.loads(request.body)
+            except Exception as json_error:
+                logger.error(f'Failed to parse JSON from body: {json_error}')
+                data = {}
+        
+        data = data or {}
+        
+        # Validate input
+        serializer = JoinRequestSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        
+        # Create join request
+        result = user_list_service.create_join_request(
+            user=user,
+            list_id=list_id,
+            message=validated.get('message', '')
+        )
+        
+        return Response(result, status=status.HTTP_201_CREATED)
+        
+    except DRFValidationError as e:
+        return Response({'error': e.detail}, status=status.HTTP_400_BAD_REQUEST)
+    except ValidationError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception('Error in join_request_create: %s', e)
+        return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def join_request_list(request, list_id):
+    """Get all pending join requests for a list.
+    
+    Path params:
+    - list_id: ID of the list
+    
+    Permission requirements:
+    - Only the list OWNER can view join requests
+    
+    Response includes:
+    - List info
+    - All pending join requests with user info and messages
+    
+    Example: GET /api/list/1/requests/
+    """
+    try:
+        owner = request.user
+        
+        result = user_list_service.get_list_join_requests(
+            owner=owner,
+            list_id=list_id
+        )
+        
+        return Response(result, status=status.HTTP_200_OK)
+        
+    except DRFValidationError as e:
+        return Response({'error': e.detail}, status=status.HTTP_400_BAD_REQUEST)
+    except ValidationError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception('Error in join_request_list: %s', e)
+        return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def join_request_respond(request, list_id, request_id):
+    """Respond to a join request (approve or reject).
+    
+    Path params:
+    - list_id: ID of the list
+    - request_id: ID of the join request
+    
+    Body params:
+    - action (required): 'approve' or 'reject'
+    - can_edit (optional, default=False): Permission level when approving
+        * True: member can edit the list
+        * False: member can only view the list
+        * Ignored when action is 'reject'
+    
+    Permission requirements:
+    - Only the list OWNER can respond to join requests
+    
+    Example request:
+    POST /api/list/1/requests/5/respond/
+    {
+        "action": "approve",
+        "can_edit": false
+    }
+    """
+    try:
+        import json
+        
+        owner = request.user
+        
+        # Handle request data parsing with error handling
+        try:
+            data = request.data
+        except Exception as parse_error:
+            logger.warning(f'Failed to parse request data: {parse_error}')
+            try:
+                data = json.loads(request.body)
+            except Exception as json_error:
+                logger.error(f'Failed to parse JSON from body: {json_error}')
+                data = {}
+        
+        data = data or {}
+        
+        # Validate input
+        serializer = JoinRequestRespondSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        
+        # Respond to join request
+        result = user_list_service.respond_to_join_request(
+            owner=owner,
+            list_id=list_id,
+            request_id=request_id,
+            action=validated['action'],
+            can_edit=validated.get('can_edit', False)
+        )
+        
+        return Response(result, status=status.HTTP_200_OK)
+        
+    except DRFValidationError as e:
+        return Response({'error': e.detail}, status=status.HTTP_400_BAD_REQUEST)
+    except ValidationError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception('Error in join_request_respond: %s', e)
         return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

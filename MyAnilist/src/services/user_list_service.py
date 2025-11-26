@@ -213,3 +213,207 @@ class UserListService:
             'joined_at': updated.joined_at.isoformat() if updated.joined_at else None,
             'permission_level': 'edit' if can_edit else 'view',
         }
+
+    def create_join_request(self, user, list_id: int, message: str = '') -> Dict[str, Any]:
+        """
+        Create a join request for a list.
+
+        Validation rules:
+        - List must exist and be public
+        - User cannot be the owner of the list
+        - User cannot already be a member of the list
+        - User cannot have pending or approved request for this list
+
+        Args:
+            user: User requesting to join
+            list_id: ID of the list
+            message: Optional message from user
+
+        Returns:
+            Dictionary containing join request info
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        # Check if list exists
+        lst = self.list_repo.get_details_of_list(list_id)
+        if not lst:
+            raise ValidationError('List not found')
+
+        # Check if list is public
+        if lst.isPrivate:
+            raise ValidationError('You can only request to join public lists')
+
+        # Check if user is the owner
+        is_owner = self.list_repo.check_user_is_owner(user, list_id)
+        if is_owner:
+            raise ValidationError('You cannot request to join your own list')
+
+        # Check if user is already a member
+        if self.user_list_repo.check_user_is_member(user, list_id):
+            raise ValidationError('You are already a member of this list')
+
+        # Check if user has pending or approved request
+        if self.user_list_repo.check_has_pending_or_approved_request(user, list_id):
+            raise ValidationError('You already have a pending or approved request for this list')
+
+        try:
+            join_request = self.user_list_repo.create_join_request(
+                user=user,
+                list_obj=lst,
+                message=message
+            )
+
+            return {
+                'request_id': join_request.request_id,
+                'user_id': user.pk,
+                'username': user.username,
+                'list_id': lst.list_id,
+                'list_name': lst.list_name,
+                'message': join_request.message,
+                'status': join_request.status,
+                'requested_at': join_request.requested_at.isoformat() if join_request.requested_at else None,
+            }
+        except IntegrityError as e:
+            logger.exception('Error creating join request for list %s: %s', list_id, e)
+            raise ValidationError('A join request already exists for this list')
+        except Exception as e:
+            logger.exception('Error creating join request for list %s: %s', list_id, e)
+            raise
+
+    def get_list_join_requests(self, owner, list_id: int) -> Dict[str, Any]:
+        """
+        Get all pending join requests for a list. Only owner can view.
+
+        Args:
+            owner: User requesting (must be owner)
+            list_id: ID of the list
+
+        Returns:
+            Dictionary with list info and pending requests
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        # Check if list exists
+        lst = self.list_repo.get_details_of_list(list_id)
+        if not lst:
+            raise ValidationError('List not found')
+
+        # Check if requester is owner
+        is_owner = self.list_repo.check_user_is_owner(owner, list_id)
+        if not is_owner:
+            raise ValidationError('Only the list owner can view join requests')
+
+        # Get all pending requests
+        requests = self.user_list_repo.get_list_pending_requests(list_id)
+
+        request_list = []
+        for req in requests:
+            request_list.append({
+                'request_id': req.request_id,
+                'user_id': req.user.pk,
+                'username': req.user.username,
+                'message': req.message,
+                'status': req.status,
+                'requested_at': req.requested_at.isoformat() if req.requested_at else None,
+            })
+
+        return {
+            'list_id': lst.list_id,
+            'list_name': lst.list_name,
+            'total_requests': len(request_list),
+            'requests': request_list,
+        }
+
+    def respond_to_join_request(self, owner, list_id: int, request_id: int, action: str, can_edit: bool = False) -> Dict[str, Any]:
+        """
+        Respond to a join request (approve or reject). Only owner can respond.
+
+        Args:
+            owner: User responding (must be owner)
+            list_id: ID of the list
+            request_id: ID of the join request
+            action: 'approve' or 'reject'
+            can_edit: Permission level when approving (ignored for reject)
+
+        Returns:
+            Dictionary containing response info
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        # Check if list exists
+        lst = self.list_repo.get_details_of_list(list_id)
+        if not lst:
+            raise ValidationError('List not found')
+
+        # Check if requester is owner
+        is_owner = self.list_repo.check_user_is_owner(owner, list_id)
+        if not is_owner:
+            raise ValidationError('Only the list owner can respond to join requests')
+
+        # Get join request
+        join_request = self.user_list_repo.get_join_request_by_id(request_id)
+        if not join_request:
+            raise ValidationError('Join request not found')
+
+        # Verify request belongs to this list
+        if join_request.list_id != list_id:
+            raise ValidationError('Join request does not belong to this list')
+
+        # Check if request is pending
+        if join_request.status != 'pending':
+            raise ValidationError(f'Join request has already been {join_request.status}')
+
+        try:
+            if action == 'approve':
+                # Add user as member
+                user_list = self.user_list_repo.add_member_to_list(
+                    user=join_request.user,
+                    list_obj=lst,
+                    is_owner=False,
+                    can_edit=can_edit
+                )
+
+                updated_request = self.user_list_repo.update_request_status(
+                    request_id=request_id,
+                    status='approved',
+                    responded_by=owner
+                )
+
+                return {
+                    'action': 'approved',
+                    'request_id': request_id,
+                    'user_id': join_request.user.pk,
+                    'username': join_request.user.username,
+                    'list_id': lst.list_id,
+                    'list_name': lst.list_name,
+                    'can_edit': can_edit,
+                    'permission_level': 'edit' if can_edit else 'view',
+                    'responded_at': updated_request.responded_at.isoformat() if updated_request and updated_request.responded_at else None,
+                }
+
+            else:  # reject
+                updated_request = self.user_list_repo.update_request_status(
+                    request_id=request_id,
+                    status='rejected',
+                    responded_by=owner
+                )
+
+                return {
+                    'action': 'rejected',
+                    'request_id': request_id,
+                    'user_id': join_request.user.pk,
+                    'username': join_request.user.username,
+                    'list_id': lst.list_id,
+                    'list_name': lst.list_name,
+                    'responded_at': updated_request.responded_at.isoformat() if updated_request and updated_request.responded_at else None,
+                }
+
+        except IntegrityError as e:
+            logger.exception('Error responding to join request %s: %s', request_id, e)
+            raise ValidationError('User is already a member of this list')
+        except Exception as e:
+            logger.exception('Error responding to join request %s: %s', request_id, e)
+            raise

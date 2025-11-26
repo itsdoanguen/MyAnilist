@@ -10,7 +10,6 @@ class List(models.Model):
     isPrivate = models.BooleanField(default=False)
     color = models.CharField(max_length=7, default='#3498db')  # Hex color code
     
-    # Thêm field description cho list
     description = models.TextField(blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -28,7 +27,6 @@ class UserList(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_lists')
     list = models.ForeignKey(List, on_delete=models.CASCADE, related_name='user_lists')
     
-    # Thêm field để xác định quyền của user với list
     is_owner = models.BooleanField(default=False)
     can_edit = models.BooleanField(default=False)
     joined_at = models.DateTimeField(default=timezone.now)
@@ -49,7 +47,6 @@ class AnimeList(models.Model):
     anilist_id = models.IntegerField()  # ID từ AniList API
     added_date = models.DateTimeField(default=timezone.now)
     
-    # Thêm field để lưu thêm thông tin
     added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     note = models.TextField(blank=True)
     
