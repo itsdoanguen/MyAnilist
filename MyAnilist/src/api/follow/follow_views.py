@@ -102,7 +102,7 @@ def follow_create(request, anilist_id):
         }
 
         try:
-            user_service.create_activity(auth_user, 'followed_anime', 'AnimeFollow', follow.anilist_id, {}, is_public=True)
+            user_service.create_user_activity(auth_user, 'followed_anime', 'AnimeFollow', follow.anilist_id, {}, is_public=True)
         except Exception:
             return Response({'error': 'Error when logging activity'}, status=status.HTTP_502_BAD_GATEWAY)
 
@@ -144,7 +144,7 @@ def follow_update(request, anilist_id):
         }
 
         try: 
-            user_service.create_activity(auth_user, 'updated_followed_anime', 'AnimeFollow', follow.anilist_id, {}, is_public=True)
+            user_service.create_user_activity(auth_user, 'updated_followed_anime', 'AnimeFollow', follow.anilist_id, {}, is_public=True)
         except Exception:
             return Response({'error': 'Error when logging activity'}, status=status.HTTP_502_BAD_GATEWAY)
 
