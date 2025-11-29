@@ -62,12 +62,17 @@ class AnimeList(models.Model):
 
 
 class ListJoinRequest(models.Model):
-    """Model for users requesting to join a list."""
+    """Model for users requesting to join a list or request edit permission."""
     
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
+    ]
+    
+    REQUEST_TYPE_CHOICES = [
+        ('join', 'Join List'),
+        ('edit_permission', 'Request Edit Permission'),
     ]
     
     request_id = models.AutoField(primary_key=True)
@@ -80,6 +85,12 @@ class ListJoinRequest(models.Model):
         User, 
         on_delete=models.CASCADE, 
         related_name='list_join_requests'
+    )
+    request_type = models.CharField(
+        max_length=20,
+        choices=REQUEST_TYPE_CHOICES,
+        default='join',
+        help_text="Type of request: join (become member) or edit_permission (upgrade to editor)"
     )
     status = models.CharField(
         max_length=20, 
@@ -99,10 +110,10 @@ class ListJoinRequest(models.Model):
     
     class Meta:
         db_table = 'list_join_requests'
-        unique_together = ['list', 'user', 'status']  
-        verbose_name = 'List Join Request'
-        verbose_name_plural = 'List Join Requests'
+        unique_together = ['list', 'user', 'status', 'request_type']  
+        verbose_name = 'List Request'
+        verbose_name_plural = 'List Requests'
         ordering = ['-requested_at']
     
     def __str__(self):
-        return f"{self.user.username} -> {self.list.list_name} ({self.status})"
+        return f"{self.user.username} -> {self.list.list_name} ({self.request_type}: {self.status})"

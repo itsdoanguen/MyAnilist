@@ -129,7 +129,14 @@ class MemberPermissionUpdateSerializer(serializers.Serializer):
 
 
 class JoinRequestSerializer(serializers.Serializer):
-    """Serializer for creating a join request."""
+    """Serializer for creating a join or edit permission request."""
+    
+    request_type = serializers.ChoiceField(
+        choices=['join', 'edit_permission'],
+        required=False,
+        default='join',
+        help_text='Type of request: join (become member) or edit_permission (upgrade to editor)'
+    )
     
     message = serializers.CharField(
         required=False,

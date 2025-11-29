@@ -20,10 +20,14 @@ urlpatterns = [
     path('member/<int:list_id>/permission/', member_permission_update, name='member_permission_update'),
     path('member/<int:list_id>/status/', check_user_status, name='check_user_status'),
     
-    # Join requests
-    path('<int:list_id>/request-join/', join_request_create, name='join_request_create'),
+    #View join/edit requests
     path('<int:list_id>/requests/', join_request_list, name='join_request_list'),
-    path('<int:list_id>/requests/<int:request_id>/respond/', join_request_respond, name='join_request_respond'),
+    # Join requests 
+    path('<int:list_id>/request-join/', join_request_create, name='join_request_create'),
+    path('<int:list_id>/join-requests/<int:request_id>/respond/', join_request_respond, name='join_request_respond'),
+    # Edit permission requests
+    path('<int:list_id>/request-edit/', join_request_create, name='edit_permission_request_create'),
+    path('<int:list_id>/edit-requests/<int:request_id>/respond/', join_request_respond, name='edit_request_respond'),
     
     # Anime in list management
     path('anime/<int:list_id>/add/', anime_add, name='anime_add'),

@@ -214,23 +214,29 @@ class UserListService:
             'permission_level': 'edit' if can_edit else 'view',
         }
 
-    def create_join_request(self, user, list_id: int, message: str = '') -> Dict[str, Any]:
+    def create_join_request(self, user, list_id: int, request_type: str = 'join', message: str = '') -> Dict[str, Any]:
         """
-        Create a join request for a list.
+        Create a join or edit permission request for a list.
 
-        Validation rules:
+        Validation rules for 'join':
         - List must exist and be public
-        - User cannot be the owner of the list
-        - User cannot already be a member of the list
-        - User cannot have pending or approved request for this list
+        - User cannot be the owner
+        - User cannot already be a member
+        - User cannot have pending/approved join request
+
+        Validation rules for 'edit_permission':
+        - List must exist
+        - User must be a member with can_edit=False
+        - User cannot have pending/approved edit_permission request
 
         Args:
-            user: User requesting to join
+            user: User making the request
             list_id: ID of the list
+            request_type: 'join' or 'edit_permission'
             message: Optional message from user
 
         Returns:
-            Dictionary containing join request info
+            Dictionary containing request info
 
         Raises:
             ValidationError: If validation fails
@@ -240,27 +246,44 @@ class UserListService:
         if not lst:
             raise ValidationError('List not found')
 
-        # Check if list is public
-        if lst.isPrivate:
-            raise ValidationError('You can only request to join public lists')
+        if request_type == 'join':
+            # Validation for join request
+            if lst.isPrivate:
+                raise ValidationError('You can only request to join public lists')
 
-        # Check if user is the owner
-        is_owner = self.list_repo.check_user_is_owner(user, list_id)
-        if is_owner:
-            raise ValidationError('You cannot request to join your own list')
+            is_owner = self.list_repo.check_user_is_owner(user, list_id)
+            if is_owner:
+                raise ValidationError('You cannot request to join your own list')
 
-        # Check if user is already a member
-        if self.user_list_repo.check_user_is_member(user, list_id):
-            raise ValidationError('You are already a member of this list')
+            if self.user_list_repo.check_user_is_member(user, list_id):
+                raise ValidationError('You are already a member of this list')
 
-        # Check if user has pending or approved request
-        if self.user_list_repo.check_has_pending_or_approved_request(user, list_id):
-            raise ValidationError('You already have a pending or approved request for this list')
+            if self.user_list_repo.check_has_pending_or_approved_request(user, list_id, 'join'):
+                raise ValidationError('You already have a pending or approved join request for this list')
+
+        elif request_type == 'edit_permission':
+            # Validation for edit permission request
+            user_list = self.user_list_repo.get_user_list(user, list_id)
+            if not user_list:
+                raise ValidationError('You must be a member of this list to request edit permission')
+
+            if user_list.is_owner:
+                raise ValidationError('You are already the owner of this list')
+
+            if user_list.can_edit:
+                raise ValidationError('You already have edit permission for this list')
+
+            if self.user_list_repo.check_has_pending_or_approved_request(user, list_id, 'edit_permission'):
+                raise ValidationError('You already have a pending or approved edit permission request for this list')
+
+        else:
+            raise ValidationError('Invalid request type. Must be "join" or "edit_permission"')
 
         try:
             join_request = self.user_list_repo.create_join_request(
                 user=user,
                 list_obj=lst,
+                request_type=request_type,
                 message=message
             )
 
@@ -270,15 +293,16 @@ class UserListService:
                 'username': user.username,
                 'list_id': lst.list_id,
                 'list_name': lst.list_name,
+                'request_type': join_request.request_type,
                 'message': join_request.message,
                 'status': join_request.status,
                 'requested_at': join_request.requested_at.isoformat() if join_request.requested_at else None,
             }
         except IntegrityError as e:
-            logger.exception('Error creating join request for list %s: %s', list_id, e)
-            raise ValidationError('A join request already exists for this list')
+            logger.exception('Error creating %s request for list %s: %s', request_type, list_id, e)
+            raise ValidationError(f'A {request_type} request already exists for this list')
         except Exception as e:
-            logger.exception('Error creating join request for list %s: %s', list_id, e)
+            logger.exception('Error creating %s request for list %s: %s', request_type, list_id, e)
             raise
 
     def get_list_join_requests(self, owner, list_id: int) -> Dict[str, Any]:
@@ -314,6 +338,7 @@ class UserListService:
                 'request_id': req.request_id,
                 'user_id': req.user.pk,
                 'username': req.user.username,
+                'request_type': req.request_type,
                 'message': req.message,
                 'status': req.status,
                 'requested_at': req.requested_at.isoformat() if req.requested_at else None,
@@ -328,14 +353,17 @@ class UserListService:
 
     def respond_to_join_request(self, owner, list_id: int, request_id: int, action: str, can_edit: bool = False) -> Dict[str, Any]:
         """
-        Respond to a join request (approve or reject). Only owner can respond.
+        Respond to a join or edit permission request (approve or reject). Only owner can respond.
+
+        For 'join' request approval: Add user as member with specified can_edit permission
+        For 'edit_permission' request approval: Update existing member's can_edit to True
 
         Args:
             owner: User responding (must be owner)
             list_id: ID of the list
-            request_id: ID of the join request
+            request_id: ID of the request
             action: 'approve' or 'reject'
-            can_edit: Permission level when approving (ignored for reject)
+            can_edit: Permission level when approving join request (ignored for reject and edit_permission)
 
         Returns:
             Dictionary containing response info
@@ -351,30 +379,46 @@ class UserListService:
         # Check if requester is owner
         is_owner = self.list_repo.check_user_is_owner(owner, list_id)
         if not is_owner:
-            raise ValidationError('Only the list owner can respond to join requests')
+            raise ValidationError('Only the list owner can respond to requests')
 
-        # Get join request
+        # Get request
         join_request = self.user_list_repo.get_join_request_by_id(request_id)
         if not join_request:
-            raise ValidationError('Join request not found')
+            raise ValidationError('Request not found')
 
         # Verify request belongs to this list
         if join_request.list_id != list_id:
-            raise ValidationError('Join request does not belong to this list')
+            raise ValidationError('Request does not belong to this list')
 
         # Check if request is pending
         if join_request.status != 'pending':
-            raise ValidationError(f'Join request has already been {join_request.status}')
+            raise ValidationError(f'Request has already been {join_request.status}')
 
         try:
             if action == 'approve':
-                # Add user as member
-                user_list = self.user_list_repo.add_member_to_list(
-                    user=join_request.user,
-                    list_obj=lst,
-                    is_owner=False,
-                    can_edit=can_edit
-                )
+                if join_request.request_type == 'join':
+                    # Add user as member
+                    user_list = self.user_list_repo.add_member_to_list(
+                        user=join_request.user,
+                        list_obj=lst,
+                        is_owner=False,
+                        can_edit=can_edit
+                    )
+                    final_can_edit = can_edit
+                    permission_level = 'edit' if can_edit else 'view'
+                
+                elif join_request.request_type == 'edit_permission':
+                    # Update existing member to editor
+                    user_list = self.user_list_repo.update_member_permissions(
+                        user=join_request.user,
+                        list_id=list_id,
+                        can_edit=True
+                    )
+                    final_can_edit = True
+                    permission_level = 'edit'
+                
+                else:
+                    raise ValidationError(f'Unknown request type: {join_request.request_type}')
 
                 updated_request = self.user_list_repo.update_request_status(
                     request_id=request_id,
@@ -385,12 +429,13 @@ class UserListService:
                 return {
                     'action': 'approved',
                     'request_id': request_id,
+                    'request_type': join_request.request_type,
                     'user_id': join_request.user.pk,
                     'username': join_request.user.username,
                     'list_id': lst.list_id,
                     'list_name': lst.list_name,
-                    'can_edit': can_edit,
-                    'permission_level': 'edit' if can_edit else 'view',
+                    'can_edit': final_can_edit,
+                    'permission_level': permission_level,
                     'responded_at': updated_request.responded_at.isoformat() if updated_request and updated_request.responded_at else None,
                 }
 
@@ -404,6 +449,7 @@ class UserListService:
                 return {
                     'action': 'rejected',
                     'request_id': request_id,
+                    'request_type': join_request.request_type,
                     'user_id': join_request.user.pk,
                     'username': join_request.user.username,
                     'list_id': lst.list_id,
@@ -412,10 +458,13 @@ class UserListService:
                 }
 
         except IntegrityError as e:
-            logger.exception('Error responding to join request %s: %s', request_id, e)
-            raise ValidationError('User is already a member of this list')
+            logger.exception('Error responding to request %s: %s', request_id, e)
+            if join_request.request_type == 'join':
+                raise ValidationError('User is already a member of this list')
+            else:
+                raise ValidationError('Failed to update member permissions')
         except Exception as e:
-            logger.exception('Error responding to join request %s: %s', request_id, e)
+            logger.exception('Error responding to request %s: %s', request_id, e)
             raise
 
     def check_user_list_status(self, user, list_id: int) -> Dict[str, Any]:
@@ -450,28 +499,45 @@ class UserListService:
         is_member = user_list is not None
         can_edit = user_list.can_edit if user_list else False
 
-        # Check if user has pending request
-        pending_request = self.user_list_repo.get_pending_request(user, list_id)
-        has_pending_request = pending_request is not None
+        # Check if user has pending requests (both types)
+        pending_join_request = self.user_list_repo.get_pending_request(user, list_id, 'join')
+        pending_edit_request = self.user_list_repo.get_pending_request(user, list_id, 'edit_permission')
+        
+        has_pending_join_request = pending_join_request is not None
+        has_pending_edit_request = pending_edit_request is not None
 
         # User can request to join if:
         # - List is public
         # - User is not the owner
         # - User is not already a member
-        # - User does not have a pending request
+        # - User does not have a pending join request
         can_request_join = (
             not lst.isPrivate and
             not is_owner and
             not is_member and
-            not has_pending_request
+            not has_pending_join_request
+        )
+
+        # User can request edit permission if:
+        # - User is a member
+        # - User is not owner
+        # - User currently has can_edit=False (is viewer)
+        # - User does not have a pending edit permission request
+        can_request_edit_permission = (
+            is_member and
+            not is_owner and
+            not can_edit and
+            not has_pending_edit_request
         )
 
         result = {
             'is_owner': is_owner,
             'is_member': is_member,
             'can_edit': can_edit,
-            'has_pending_request': has_pending_request,
+            'has_pending_join_request': has_pending_join_request,
+            'has_pending_edit_request': has_pending_edit_request,
             'can_request_join': can_request_join,
+            'can_request_edit_permission': can_request_edit_permission,
             'is_public': not lst.isPrivate,
         }
 

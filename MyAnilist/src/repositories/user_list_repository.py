@@ -116,13 +116,14 @@ class UserListRepository:
             return None
 
     @staticmethod
-    def create_join_request(user, list_obj, message: str = ''):
+    def create_join_request(user, list_obj, request_type: str = 'join', message: str = ''):
         """
-        Create a join request for a list.
+        Create a join or edit permission request for a list.
 
         Args:
-            user: User requesting to join
+            user: User making the request
             list_obj: List instance
+            request_type: Type of request ('join' or 'edit_permission')
             message: Optional message from user
 
         Returns:
@@ -138,17 +139,23 @@ class UserListRepository:
             join_request = ListJoinRequest.objects.create(
                 user=user,
                 list=list_obj,
+                request_type=request_type,
                 message=message,
                 status='pending'
             )
             return join_request
         except IntegrityError:
-            raise IntegrityError('A join request already exists for this list')
+            raise IntegrityError(f'A {request_type} request already exists for this list')
 
     @staticmethod
-    def get_pending_request(user, list_id: int):
+    def get_pending_request(user, list_id: int, request_type: str = None):
         """
-        Get pending join request for a user and list.
+        Get pending request for a user and list.
+
+        Args:
+            user: User instance
+            list_id: List ID
+            request_type: Optional filter by request type ('join' or 'edit_permission')
 
         Returns:
             ListJoinRequest instance or None
@@ -156,11 +163,15 @@ class UserListRepository:
         from src.models.list import ListJoinRequest
 
         try:
-            return ListJoinRequest.objects.get(
-                user=user,
-                list_id=list_id,
-                status='pending'
-            )
+            filters = {
+                'user': user,
+                'list_id': list_id,
+                'status': 'pending'
+            }
+            if request_type:
+                filters['request_type'] = request_type
+            
+            return ListJoinRequest.objects.filter(**filters).first()
         except ListJoinRequest.DoesNotExist:
             return None
 
@@ -184,20 +195,29 @@ class UserListRepository:
             return None
 
     @staticmethod
-    def check_has_pending_or_approved_request(user, list_id: int) -> bool:
+    def check_has_pending_or_approved_request(user, list_id: int, request_type: str = None) -> bool:
         """
         Check if user has pending or approved request for a list.
+
+        Args:
+            user: User instance
+            list_id: List ID
+            request_type: Optional filter by request type ('join' or 'edit_permission')
 
         Returns:
             True if exists, False otherwise
         """
         from src.models.list import ListJoinRequest
 
-        return ListJoinRequest.objects.filter(
-            user=user,
-            list_id=list_id,
-            status__in=['pending', 'approved']
-        ).exists()
+        filters = {
+            'user': user,
+            'list_id': list_id,
+            'status__in': ['pending', 'approved']
+        }
+        if request_type:
+            filters['request_type'] = request_type
+        
+        return ListJoinRequest.objects.filter(**filters).exists()
 
     @staticmethod
     def get_list_pending_requests(list_id: int):

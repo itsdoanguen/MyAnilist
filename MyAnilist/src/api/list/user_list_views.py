@@ -260,24 +260,39 @@ def member_permission_update(request, list_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def join_request_create(request, list_id):
-    """Create a join request for a public list.
+    """Create a join or edit permission request for a list.
     
     Path params:
-    - list_id: ID of the list to join
+    - list_id: ID of the list
     
     Body params:
+    - request_type (optional, default='join'): Type of request
+        * 'join': Request to join the list (user not a member)
+        * 'edit_permission': Request edit permission (user is viewer)
     - message (optional): Optional message to the list owner
     
-    Validation rules:
+    Validation rules for 'join':
     - List must exist and be public
-    - User cannot be the owner of the list
-    - User cannot already be a member of the list
-    - User cannot have pending or approved request for this list
+    - User cannot be the owner
+    - User cannot already be a member
+    - User cannot have pending/approved join request
     
-    Example request:
+    Validation rules for 'edit_permission':
+    - User must be a member with can_edit=False
+    - User cannot have pending/approved edit permission request
+    
+    Example request (join):
     POST /api/list/1/request-join/
     {
-        "message": "cho join voi"
+        "request_type": "join",
+        "message": "cho toi di theo voi"
+    }
+    
+    Example request (edit permission):
+    POST /api/list/1/request-edit-permission/
+    {
+        "request_type": "edit_permission",
+        "message": "noi nhan gian sum vay"
     }
     """
     try:
@@ -302,10 +317,11 @@ def join_request_create(request, list_id):
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
         
-        # Create join request
+        # Create request
         result = user_list_service.create_join_request(
             user=user,
             list_id=list_id,
+            request_type=validated.get('request_type', 'join'),
             message=validated.get('message', '')
         )
         
@@ -323,17 +339,17 @@ def join_request_create(request, list_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def join_request_list(request, list_id):
-    """Get all pending join requests for a list.
+    """Get all pending requests (join and edit permission) for a list.
     
     Path params:
     - list_id: ID of the list
     
     Permission requirements:
-    - Only the list OWNER can view join requests
+    - Only the list OWNER can view requests
     
     Response includes:
     - List info
-    - All pending join requests with user info and messages
+    - All pending requests with user info, request_type, and messages
     
     Example: GET /api/list/1/requests/
     """
