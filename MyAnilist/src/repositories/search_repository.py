@@ -99,7 +99,7 @@ class SearchRepository:
         genres: List[str] = None, 
         year: Optional[int] = None, 
         season: Optional[str] = None, 
-        format: List[str] = None, 
+        format: Optional[str] = None, 
         status: Optional[str] = None, 
         sort: str = None, 
         page: int = 1, 
@@ -112,8 +112,8 @@ class SearchRepository:
             genres: List of genre strings
             year: Year (e.g., 2025)
             season: Season (SPRING, SUMMER, FALL, WINTER)
-            format: Format (TV_SHOW, TV_SHORT, MOVIE, SPECIAL, OVA, ONA, MUSIC)
-            status: Status (AIRING, FINISHED, NOT_YET_RELEASE, CANCELLED)
+            format: Format (TV, TV_SHORT, MOVIE, SPECIAL, OVA, ONA, MUSIC)
+            status: Status (RELEASING, FINISHED, NOT_YET_RELEASED, CANCELLED, HIATUS)
             sort: Sort order (POPULARITY_DESC, SCORE_DESC, TRENDING_DESC, etc.)
             page: Page number for pagination
             perpage: Number of items per page
@@ -128,25 +128,29 @@ class SearchRepository:
             'genres': genres if genres else None,
             'season': season.upper() if season else None,
             'seasonYear': int(year) if year else None,
-            'format': format if format else None,
+            'format': format.upper() if format else None,
             'status': status.upper() if status else None,
             'page': page,
             'perpage': perpage,
-            'sort': sort.upper() if sort else None,
+            'sort': [sort.upper()] if sort else None, 
         }
 
-        # Prune None values so GraphQL filters are not applied unintentionally
         pruned_vars = {k: v for k, v in variables.items() if v is not None}
         logger.debug('fetch_media_by_criteria variables (pruned): %s', pruned_vars)
         
         payload = {'query': ANIME_SEARCH_CRITERIA_QS, 'variables': pruned_vars}
         
         resp = requests.post(self.ANILIST_ENDPOINT, json=payload, timeout=10)
+        
+        # Log response for debugging
+        if resp.status_code != 200:
+            logger.error('AniList API error %d: %s', resp.status_code, resp.text)
+        
         resp.raise_for_status()
         
         data = resp.json()
         if 'errors' in data:
-            logger.debug('AniList returned errors: %s', data['errors'])
+            logger.error('AniList returned errors: %s', data['errors'])
             raise RuntimeError(data['errors'])
 
         media = data.get('data', {}).get('Page', {}).get('media', [])

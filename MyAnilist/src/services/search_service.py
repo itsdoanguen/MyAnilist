@@ -95,7 +95,7 @@ class SearchService:
         return candidates
 
     def search_by_criteria(self, genres: List[str] = None, year: int = None, season: str = None, 
-                          format: List[str] = None, status: str = None, sort: str = None, 
+                          format: str = None, status: str = None, sort: str = None, 
                           page: int = 1, perpage: int = 10) -> List[dict]:
         """Search for anime by multiple criteria including genres, year, season, format, and status."""
         current_year = timezone.now().year
@@ -103,8 +103,6 @@ class SearchService:
         # normalize defaults
         if genres is None:
             genres = []
-        if format is None:
-            format = []
         if year is None:
             year = current_year 
 

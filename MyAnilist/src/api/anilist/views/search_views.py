@@ -10,58 +10,91 @@ logger = logging.getLogger(__name__)
 service = SearchService()
 
 
-@api_view(['GET', 'POST'])
+@api_view(['POST'])
 @permission_classes([AllowAny])
 def search_by_criteria(request):
-	"""
-	Search for anime by criteria. Include Genres, Year, Season, Format, Status
-	
-	Query/Body parameters:
-	- genres: list of genre strings
-	- year: integer year (optional, defaults to current year)
-	- season: SPRING, SUMMER, FALL, WINTER
-	- format: TV_SHOW, TV_SHORT, MOVIE, SPECIAL, OVA, ONA, MUSIC
-	- status: AIRING, FINISHED, NOT_YET_RELEASE, CANCELLED
-	- sort: POPULARITY_DESC, TITLE_ROMAJI, SCORE_DESC, TRENDING_DESC, etc
-	"""
-	if request.method == 'GET':
-		genres = request.query_params.getlist('genres') or None
-		year = request.query_params.get('year') or None
-		season = request.query_params.get('season') or None
-		media_format = request.query_params.get('format') or None
-		media_status = request.query_params.get('status') or None
-		sort = request.query_params.get('sort') or None
-	else:
-		body = request.data or {}
-		genres = body.get('genres', [])
-		year = body.get('year')
-		season = body.get('season')
-		media_format = body.get('format')
-		media_status = body.get('status')
-		sort = body.get('sort')
+    """
+    Search for anime by criteria. Include Genres, Year, Season, Format, Status
+    
+    Body parameters (JSON):
+    - genres: list of genre strings
+    - year: integer year (optional)
+    - season: SPRING, SUMMER, FALL, WINTER
+    - format: TV, TV_SHORT, MOVIE, SPECIAL, OVA, ONA, MUSIC
+    - status: RELEASING, FINISHED, NOT_YET_RELEASED, CANCELLED, HIATUS
+    - sort: POPULARITY_DESC, TITLE_ROMAJI, SCORE_DESC, TRENDING_DESC
+    - page: integer page number (default: 1)
+    - perpage: integer items per page (default: 20)
 
-	try:
-		try:
-			year_val = int(year) if year else None
-		except (TypeError, ValueError):
-			return Response({'error': 'year must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+    Example request:
+    POST /api/anilist/search/criteria/
+    {
+        "year": 2025,
+        "season": "SPRING",
+        "genres": ["Action", "Adventure"],
+        "format": "TV",
+        "status": "RELEASING",
+        "sort": "POPULARITY_DESC",
+        "page": 1,
+        "perpage": 20
+    }
 
-		logger.debug('search_by_criteria called with genres=%s year=%s season=%s format=%s status=%s sort=%s', 
-					 genres, year_val, season, media_format, media_status, sort)
+	??NOTE: Sometimes if the request is successful but no results are found, it means no anime matched the criteria. Not the code fault lol =)) These criteria above return no results, i checked manually on AniList website already.
+    """
+    try:
+        # Parse JSON body
+        body = request.data or {}
+        
+        genres = body.get('genres', [])
+        year = body.get('year')
+        season = body.get('season')
+        media_format = body.get('format')
+        media_status = body.get('status')
+        sort = body.get('sort')
+        page = body.get('page', 1)
+        perpage = body.get('perpage', 20)
+        
+        # Validate year
+        try:
+            year_val = int(year) if year else None
+        except (TypeError, ValueError):
+            return Response({'error': 'year must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate page and perpage
+        try:
+            page_val = int(page) if page else 1
+            if page_val < 1:
+                page_val = 1
+        except (TypeError, ValueError):
+            return Response({'error': 'page must be a positive integer'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            perpage_val = int(perpage) if perpage else 20
+            if perpage_val < 1:
+                perpage_val = 20
+            elif perpage_val > 50:  # Limit max results per page
+                perpage_val = 50
+        except (TypeError, ValueError):
+            return Response({'error': 'perpage must be a positive integer'}, status=status.HTTP_400_BAD_REQUEST)
 
-		results = service.search_by_criteria(
-			genres=genres, 
-			year=year_val, 
-			season=season, 
-			format=media_format, 
-			status=media_status, 
-			sort=sort
-		)
-		return Response({'results': results}, status=status.HTTP_200_OK)
-	except Exception as e:
-		logger.exception(f"Error during anime search: {e}")
-		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
+        logger.debug('search_by_criteria called with genres=%s year=%s season=%s format=%s status=%s sort=%s page=%s perpage=%s', 
+                     genres, year_val, season, media_format, media_status, sort, page_val, perpage_val)
 
+        results = service.search_by_criteria(
+            genres=genres, 
+            year=year_val, 
+            season=season, 
+            format=media_format, 
+            status=media_status, 
+            sort=sort,
+            page=page_val,
+            perpage=perpage_val
+        )
+        return Response({'results': results}, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.exception(f"Error during anime search: {e}")
+        return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

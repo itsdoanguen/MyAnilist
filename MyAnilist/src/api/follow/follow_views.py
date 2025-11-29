@@ -5,10 +5,12 @@ from rest_framework import status
 
 from src.services.user_service import UserService
 from src.services.anime_follow_service import AnimeFollowService
+from src.services.anime_service import AnimeService
 from .serializers import FollowSerializer
 
 user_service = UserService()
 follow_service = AnimeFollowService()
+anime_service = AnimeService()
 
 
 @api_view(['GET'])
@@ -102,7 +104,16 @@ def follow_create(request, anilist_id):
         }
 
         try:
-            user_service.create_user_activity(auth_user, 'followed_anime', 'AnimeFollow', follow.anilist_id, {}, is_public=True)
+            anime_info = anime_service.get_by_id(follow.anilist_id)
+            metadata = {
+                'title': anime_info.get('name_romaji') or anime_info.get('name_english', ''),
+                'cover_image': anime_info.get('cover_image', ''),
+            }
+        except Exception:
+            metadata = {}
+        
+        try:
+            user_service.create_user_activity(auth_user, 'followed_anime', 'AnimeFollow', follow.anilist_id, metadata, is_public=True)
         except Exception:
             return Response({'error': 'Error when logging activity'}, status=status.HTTP_502_BAD_GATEWAY)
 
@@ -143,8 +154,17 @@ def follow_update(request, anilist_id):
             "is_following": True,
         }
 
+        try:
+            anime_info = anime_service.get_by_id(follow.anilist_id)
+            metadata = {
+                'title': anime_info.get('name_romaji') or anime_info.get('name_english', ''),
+                'cover_image': anime_info.get('cover_image', ''),
+            }
+        except Exception:
+            metadata = {}
+        
         try: 
-            user_service.create_user_activity(auth_user, 'updated_followed_anime', 'AnimeFollow', follow.anilist_id, {}, is_public=True)
+            user_service.create_user_activity(auth_user, 'updated_followed_anime', 'AnimeFollow', follow.anilist_id, metadata, is_public=True)
         except Exception:
             return Response({'error': 'Error when logging activity'}, status=status.HTTP_502_BAD_GATEWAY)
 
