@@ -417,3 +417,67 @@ class UserListService:
         except Exception as e:
             logger.exception('Error responding to join request %s: %s', request_id, e)
             raise
+
+    def check_user_list_status(self, user, list_id: int) -> Dict[str, Any]:
+        """
+        Check user's relationship and available actions with a list.
+
+        Args:
+            user: User to check status for
+            list_id: ID of the list
+
+        Returns:
+            Dictionary containing user's status and permissions:
+            - is_owner: Whether user owns the list
+            - is_member: Whether user is a member
+            - can_edit: Whether user can edit (if member)
+            - has_pending_request: Whether user has a pending join request
+            - can_request_join: Whether user can request to join
+            - is_public: Whether the list is public
+            - pending_requests_count: Number of pending requests (if owner)
+
+        Raises:
+            ValidationError: If list not found
+        """
+        # Check if list exists
+        lst = self.list_repo.get_details_of_list(list_id)
+        if not lst:
+            raise ValidationError('List not found')
+
+        # Check if user is a member
+        user_list = self.user_list_repo.get_user_list(user, list_id)
+        is_owner = user_list.is_owner if user_list else False
+        is_member = user_list is not None
+        can_edit = user_list.can_edit if user_list else False
+
+        # Check if user has pending request
+        pending_request = self.user_list_repo.get_pending_request(user, list_id)
+        has_pending_request = pending_request is not None
+
+        # User can request to join if:
+        # - List is public
+        # - User is not the owner
+        # - User is not already a member
+        # - User does not have a pending request
+        can_request_join = (
+            not lst.isPrivate and
+            not is_owner and
+            not is_member and
+            not has_pending_request
+        )
+
+        result = {
+            'is_owner': is_owner,
+            'is_member': is_member,
+            'can_edit': can_edit,
+            'has_pending_request': has_pending_request,
+            'can_request_join': can_request_join,
+            'is_public': not lst.isPrivate,
+        }
+
+        # If user is owner, add pending requests count
+        if is_owner:
+            pending_requests = self.user_list_repo.get_list_pending_requests(list_id)
+            result['pending_requests_count'] = len(pending_requests)
+
+        return result

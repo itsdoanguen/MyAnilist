@@ -423,3 +423,58 @@ def join_request_respond(request, list_id, request_id):
     except Exception as e:
         logger.exception('Error in join_request_respond: %s', e)
         return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_user_status(request, list_id):
+    """Check current user's status and permissions with a list.
+    
+    Path params:
+    - list_id: ID of the list
+    
+    Returns:
+    - is_owner: Whether user owns the list
+    - is_member: Whether user is a member
+    - can_edit: Whether user can edit (if member)
+    - has_pending_request: Whether user has a pending join request
+    - can_request_join: Whether user can request to join the list
+    - is_public: Whether the list is public
+    - pending_requests_count: Number of pending requests (only if user is owner)
+    
+    Example response for owner:
+    {
+        "is_owner": true,
+        "is_member": true,
+        "can_edit": true,
+        "has_pending_request": false,
+        "can_request_join": false,
+        "is_public": true,
+        "pending_requests_count": 3
+    }
+    
+    Example response for non-member on public list:
+    {
+        "is_owner": false,
+        "is_member": false,
+        "can_edit": false,
+        "has_pending_request": false,
+        "can_request_join": true,
+        "is_public": true
+    }
+    """
+    try:
+        user = request.user
+        
+        result = user_list_service.check_user_list_status(
+            user=user,
+            list_id=list_id
+        )
+        
+        return Response(result, status=status.HTTP_200_OK)
+        
+    except ValidationError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception('Error in check_user_status: %s', e)
+        return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
