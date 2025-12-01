@@ -32,6 +32,35 @@ query ($id: Int) {
 }
 '''
 
+ANIME_INFO_FOR_HOMEPAGE_QS = '''
+query ($id: Int) {
+  Media(id: $id, type: ANIME) {
+    id
+    title { romaji }
+    coverImage { large }
+    bannerImage
+    averageScore
+    popularity
+    episodes
+    season
+    isAdult
+    nextAiringEpisode { airingAt timeUntilAiring episode }
+    trending
+  }
+}
+'''
+
+ANIME_INFO_LIGHTWEIGHT_QS = '''
+query ($id: Int) {
+  Media(id: $id, type: ANIME) {
+    id
+    title { romaji }
+    coverImage { large }
+    episodes
+    nextAiringEpisode { airingAt timeUntilAiring episode }
+  }
+}
+'''
 
 ANIME_ID_SEARCH_QS = '''
 query ($query: String, $page: Int, $perpage: Int) {
@@ -178,6 +207,19 @@ query ($id: Int) {
       title
       url
       site
+    }
+  }
+}
+'''
+
+ANIME_BATCH_INFO_QS = '''
+query ($ids: [Int]) {
+  Page(page: 1, perPage: 50) {
+    media(id_in: $ids, type: ANIME) {
+      id
+      title { romaji english native }
+      coverImage { large }
+      episodes
     }
   }
 }
