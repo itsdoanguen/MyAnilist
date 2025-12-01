@@ -48,7 +48,6 @@ class AnimeFollowService:
         start_time = time.time()
         logger.info(f"[PERFORMANCE] Starting get_user_anime_list_for_user for user: {user.username}")
         
-        # Step 1: Fetch follows from DB
         db_start = time.time()
         follows = self.list_follows_for_user(user)
         db_duration = time.time() - db_start
@@ -62,11 +61,9 @@ class AnimeFollowService:
             'plan_to_watch': [],
         }
 
-        # Step 2: Batch fetch all anime info in ONE API call
         api_start = time.time()
         anime_ids = [f.anilist_id for f in follows]
         
-        # Fetch in batches of 50 (AniList limit)
         anime_data_map = {}
         batch_count = 0
         for i in range(0, len(anime_ids), 50):
@@ -81,7 +78,6 @@ class AnimeFollowService:
         api_duration = time.time() - api_start
         logger.info(f"[PERFORMANCE] API batch fetch: {batch_count} batches, {len(anime_data_map)}/{len(anime_ids)} anime fetched in {api_duration:.3f}s")
 
-        # Step 3: Process each follow with pre-fetched data
         processing_start = time.time()
         for f in follows:
             item = {
@@ -91,7 +87,6 @@ class AnimeFollowService:
                 'watch_status': f.watch_status,
             }
 
-            # Get anime data from batch result
             anime_data = anime_data_map.get(f.anilist_id)
             if anime_data:
                 title = anime_data.get('title') or {}
@@ -108,7 +103,6 @@ class AnimeFollowService:
         processing_duration = time.time() - processing_start
         total_duration = time.time() - start_time
         
-        # Final performance summary
         logger.info(f"[PERFORMANCE] ===== SUMMARY FOR {user.username} =====")
         logger.info(f"[PERFORMANCE] Total time: {total_duration:.3f}s")
         logger.info(f"[PERFORMANCE] DB query: {db_duration:.3f}s ({db_duration/total_duration*100:.1f}%)")

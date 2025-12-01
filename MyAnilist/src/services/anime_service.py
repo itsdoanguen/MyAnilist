@@ -80,7 +80,8 @@ class AnimeService:
         - staff: top 3 staff (prioritized by role importance)
         """
         try:
-            chars_raw = self.repo.fetch_characters_by_anime_id(anime_id, page=1, perpage=20)
+            chars_data = self.repo.fetch_characters_by_anime_id(anime_id, page=1, perpage=20)
+            chars_raw = chars_data.get('edges', [])
             characters = []
             for char in chars_raw:
                 node = char.get('node') or {}
@@ -122,7 +123,8 @@ class AnimeService:
             selected_chars = []
 
         try:
-            staff_raw = self.repo.fetch_staff_by_anime_id(anime_id, page=1, perpage=20)
+            staff_data = self.repo.fetch_staff_by_anime_id(anime_id, page=1, perpage=20)
+            staff_raw = staff_data.get('edges', [])
             staff_list = []
             for s in staff_raw:
                 node = s.get('node') or {}
@@ -158,24 +160,26 @@ class AnimeService:
             'staff': selected_staff,
         }
 
-    def get_characters_by_anime_id(self, anime_id: int, language: str = "JAPANESE", page: int = 1, perpage: int = 10) -> List[dict]:
+    def get_characters_by_anime_id(self, anime_id: int, language: str = "JAPANESE", page: int = 1, perpage: int = 10) -> dict:
         """
         Fetch characters for a given anime ID.
 
-        Returns a list of characters. Each character includes:
-        - id, name_full, image, role, voice_actors: [ {id, name_full, name_native, image, language} ]
+        Returns a dict with:
+        - pageInfo: pagination metadata (total, currentPage, lastPage, hasNextPage, perPage)
+        - characters: list of character dicts with id, name_full, image, role, voice_actors
         """
         try:
-            characters = self.repo.fetch_characters_by_anime_id(anime_id, language=language, page=page, perpage=perpage)
+            chars_data = self.repo.fetch_characters_by_anime_id(anime_id, language=language, page=page, perpage=perpage)
         except Exception:
             logger.exception('Failed to fetch characters for anime id %s', anime_id)
-            return []
+            return {'pageInfo': {}, 'characters': []}
 
-        if not characters:
-            return []
+        edges = chars_data.get('edges', [])
+        if not edges:
+            return {'pageInfo': chars_data.get('pageInfo', {}), 'characters': []}
 
         result = []
-        for char in characters:
+        for char in edges:
             node = char.get('node') or {}
             role = char.get('role')
             image = (node.get('image') or {}).get('large')
@@ -205,26 +209,31 @@ class AnimeService:
                 'role': role,
                 'voice_actors': voice_actors,
             })
-        return result
+        return {
+            'pageInfo': chars_data.get('pageInfo', {}),
+            'characters': result
+        }
 
-    def get_staff_by_anime_id(self, anime_id: int, page: int = 1, perpage: int = 10) -> List[dict]:
+    def get_staff_by_anime_id(self, anime_id: int, page: int = 1, perpage: int = 10) -> dict:
         """
         Fetch staff for a given anime ID.
 
-        Returns a list of staff members. Each staff includes:
-        - id, name_full, name_native, image, role
+        Returns a dict with:
+        - pageInfo: pagination metadata (total, currentPage, lastPage, hasNextPage, perPage)
+        - staff: list of staff dicts with id, name_full, name_native, image, role
         """
         try:
-            staff = self.repo.fetch_staff_by_anime_id(anime_id, page=page, perpage=perpage)
+            staff_data = self.repo.fetch_staff_by_anime_id(anime_id, page=page, perpage=perpage)
         except Exception:
             logger.exception('Failed to fetch staff for anime id %s', anime_id)
-            return []
+            return {'pageInfo': {}, 'staff': []}
 
-        if not staff:
-            return []
+        edges = staff_data.get('edges', [])
+        if not edges:
+            return {'pageInfo': staff_data.get('pageInfo', {}), 'staff': []}
 
         result = []
-        for s in staff:
+        for s in edges:
             node = s.get('node') or {}
             role = s.get('role')
             name = node.get('name') or {}
@@ -237,7 +246,10 @@ class AnimeService:
                 'image': image,
                 'role': role,
             })
-        return result
+        return {
+            'pageInfo': staff_data.get('pageInfo', {}),
+            'staff': result
+        }
 
     def get_stats_by_anime_id(self, anime_id: int) -> dict:
         """

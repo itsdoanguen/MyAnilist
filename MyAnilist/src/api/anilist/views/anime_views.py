@@ -90,6 +90,7 @@ def anime_characters(request, anime_id):
 	- language: voice actor language filter (default: JAPANESE)
 	
 	Response: {
+	  'pageInfo': {total, currentPage, lastPage, hasNextPage, perPage},
 	  'characters': [ {id, name_full, image, role, voice_actors: [...]} ]
 	}
 	"""
@@ -114,8 +115,8 @@ def anime_characters(request, anime_id):
 		return Response({'error': 'perpage must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
 
 	try:
-		characters = service.get_characters_by_anime_id(ani_id_val, language=language, page=page_val, perpage=perpage_val)
-		return Response({'characters': characters}, status=status.HTTP_200_OK)
+		result = service.get_characters_by_anime_id(ani_id_val, language=language, page=page_val, perpage=perpage_val)
+		return Response(result, status=status.HTTP_200_OK)
 	except Exception as e:
 		logger.exception(f"Error fetching anime characters: {e}")
 		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)
@@ -135,6 +136,7 @@ def anime_staff(request, anime_id):
 	- perpage: integer items per page (default: 10)
 	
 	Response: {
+	  'pageInfo': {total, currentPage, lastPage, hasNextPage, perPage},
 	  'staff': [ {id, name_full, name_native, image, role} ]
 	}
 	"""
@@ -158,8 +160,8 @@ def anime_staff(request, anime_id):
 		return Response({'error': 'perpage must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
 
 	try:
-		staff = service.get_staff_by_anime_id(ani_id_val, page=page_val, perpage=perpage_val)
-		return Response({'staff': staff}, status=status.HTTP_200_OK)
+		result = service.get_staff_by_anime_id(ani_id_val, page=page_val, perpage=perpage_val)
+		return Response(result, status=status.HTTP_200_OK)
 	except Exception as e:
 		logger.exception(f"Error fetching anime staff: {e}")
 		return Response({'error': 'Error contacting AniList'}, status=status.HTTP_502_BAD_GATEWAY)

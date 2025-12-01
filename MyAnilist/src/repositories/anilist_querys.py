@@ -32,24 +32,6 @@ query ($id: Int) {
 }
 '''
 
-ANIME_INFO_FOR_HOMEPAGE_QS = '''
-query ($id: Int) {
-  Media(id: $id, type: ANIME) {
-    id
-    title { romaji }
-    coverImage { large }
-    bannerImage
-    averageScore
-    popularity
-    episodes
-    season
-    isAdult
-    nextAiringEpisode { airingAt timeUntilAiring episode }
-    trending
-  }
-}
-'''
-
 ANIME_INFO_LIGHTWEIGHT_QS = '''
 query ($id: Int) {
   Media(id: $id, type: ANIME) {
@@ -131,6 +113,13 @@ ANIME_CHARACTERS_QS = '''
 query ($id: Int, $page: Int, $perpage: Int) {
   Media(id: $id) {
     characters(page: $page, perPage: $perpage) {
+      pageInfo {
+        total
+        currentPage
+        lastPage
+        hasNextPage
+        perPage
+      }
       edges {
         node {
           id
@@ -155,6 +144,13 @@ ANIME_STAFF_QS = '''
 query ($id: Int, $page: Int, $perpage: Int) {
   Media(id: $id) {
     staff(page: $page, perPage: $perpage) {
+      pageInfo {
+        total
+        currentPage
+        lastPage
+        hasNextPage
+        perPage
+      }
       edges {
         node {
           id

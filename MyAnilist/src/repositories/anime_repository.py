@@ -109,7 +109,6 @@ class AnimeRepository:
     def fetch_anime_batch(self, anime_ids: List[int]) -> dict:
         """
         Fetch multiple anime in a single API request (up to 50 anime).
-        This is MUCH faster than calling fetch_anime_basic_info multiple times.
         
         Args:
             anime_ids: List of AniList anime IDs (max 50)
@@ -123,7 +122,6 @@ class AnimeRepository:
         if not anime_ids:
             return {}
         
-        # AniList Page query supports max 50 items
         if len(anime_ids) > 50:
             logger.warning(f'fetch_anime_batch called with {len(anime_ids)} IDs, will only fetch first 50')
             anime_ids = anime_ids[:50]
@@ -155,7 +153,6 @@ class AnimeRepository:
             logger.warning('AniList batch query returned errors: %s', data['errors'])
             raise RuntimeError(data['errors'])
         
-        # Convert list to dictionary for easy lookup
         media_list = data.get('data', {}).get('Page', {}).get('media', [])
         result = {}
         for anime in media_list:
@@ -171,7 +168,7 @@ class AnimeRepository:
         language: str = "JAPANESE", 
         page: int = 1, 
         perpage: int = 10
-    ) -> List[dict]:
+    ) -> dict:
         """
         Fetch characters for a given anime ID.
         
@@ -182,7 +179,7 @@ class AnimeRepository:
             perpage: Number of items per page
             
         Returns:
-            List of character dictionaries
+            Dictionary with pageInfo and edges (list of character dictionaries)
             
         Raises:
             RuntimeError: If API request fails or returns errors
@@ -211,14 +208,18 @@ class AnimeRepository:
             logger.debug('AniList returned errors: %s', data['errors'])
             raise RuntimeError(data['errors'])
 
-        return data.get('data', {}).get('Media', {}).get('characters', {}).get('edges', [])
+        characters_data = data.get('data', {}).get('Media', {}).get('characters', {})
+        return {
+            'pageInfo': characters_data.get('pageInfo', {}),
+            'edges': characters_data.get('edges', [])
+        }
 
     def fetch_staff_by_anime_id(
         self, 
         anime_id: int, 
         page: int = 1, 
         perpage: int = 10
-    ) -> List[dict]:
+    ) -> dict:
         """
         Fetch staff for a given anime ID.
         
@@ -228,7 +229,7 @@ class AnimeRepository:
             perpage: Number of items per page
             
         Returns:
-            List of staff dictionaries
+            Dictionary with pageInfo and edges (list of staff dictionaries)
             
         Raises:
             RuntimeError: If API request fails or returns errors
@@ -256,7 +257,11 @@ class AnimeRepository:
             logger.debug('AniList returned errors: %s', data['errors'])
             raise RuntimeError(data['errors'])
 
-        return data.get('data', {}).get('Media', {}).get('staff', {}).get('edges', [])
+        staff_data = data.get('data', {}).get('Media', {}).get('staff', {})
+        return {
+            'pageInfo': staff_data.get('pageInfo', {}),
+            'edges': staff_data.get('edges', [])
+        }
 
     def fetch_stats_by_anime_id(self, anime_id: int) -> Optional[dict]:
         """
