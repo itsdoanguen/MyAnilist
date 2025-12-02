@@ -11,7 +11,7 @@ class MailService:
 	"""Simple mail service to send verification emails."""
 
 	def __init__(self):
-		self.frontend_url = getattr(settings, 'FRONT_END_URL', None) or getattr(settings, 'FRONTEND_URL', None) or 'http://localhost:3000'
+		self.base_url = getattr(settings, 'BASE_URL', 'https://doannguyen.pythonanywhere.com')
 
 	def send_verification_email(self, user, token: str) -> bool:
 		"""Send email containing verification link to the user.
@@ -20,27 +20,33 @@ class MailService:
 		"""
 		try:
 			subject = 'Verify your MyAnilist account'
-			frontend_verify = f"{self.frontend_url}/verify-email?token={token}"
-
-			# Fallback to backend path
-			backend_path = reverse('auth_verify_email')
-			backend_host = getattr(settings, 'BACKEND_BASE_URL', None) or 'http://localhost:8000'
-			backend_verify = f"{backend_host}{backend_path}?token={token}"
+			
+			# Frontend URL (primary verification link)
+			frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+			frontend_verify_url = f"{frontend_url}/verify-email?token={token}"
+			
+			# Backend URL (backup verification link)
+			backend_url = getattr(settings, 'BASE_URL', 'https://doannguyen.pythonanywhere.com')
+			verify_path = reverse('auth_verify_email')
+			backend_verify_url = f"{backend_url}{verify_path}?token={token}"
 
 			body = (
 				f"Hi {user.username},\n\n"
-				"Thanks for registering at MyAnilist. Please verify your email by clicking the link below:\n\n"
-				f"{frontend_verify}\n\n"
-				"If your frontend does not handle verification, use this link:\n\n"
-				f"{backend_verify}\n\n"
-				"If you didn't create an account, you can ignore this message.\n\n"
-				"Regards,\nMyAnilist Team"
+				"Thank you for registering at MyAnilist!\n\n"
+				"To complete your registration, please verify your email address by clicking the link below:\n\n"
+				f"{frontend_verify_url}\n\n"
+				"If the link above doesn't work, you can use this backup link:\n"
+				f"{backend_verify_url}\n\n"
+				"This link will expire in 24 hours.\n\n"
+				"If you didn't create this account, you can safely ignore this email.\n\n"
+				"Best regards,\n"
+				"The MyAnilist Team"
 			)
 
 			email = EmailMessage(
 				subject=subject,
 				body=body,
-				from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+				from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@myanilist.com'),
 				to=[user.email]
 			)
 			email.send(fail_silently=False)

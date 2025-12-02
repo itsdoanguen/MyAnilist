@@ -17,6 +17,10 @@ DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1'] if not DEBUG else ['*']
 
+# Base URL for the application
+BASE_URL = os.getenv('BASE_URL', 'https://doannguyen.pythonanywhere.com')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
 
 # Application definition
 
