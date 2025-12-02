@@ -267,3 +267,29 @@ class UserService:
         Returns None if not found.
         """
         return self.anime_follow_service.get_follow(user, anilist_id)
+    
+    def search_users(self, query: str, limit: int = 20):
+        """
+        Search users by username.
+        
+        Args:
+            query: Search query string
+            limit: Maximum number of results (default 20)
+            
+        Returns:
+            List of user dicts with id, username, email (if available)
+        """
+        if not query or len(query.strip()) < 2:
+            return []
+        
+        users = self.user_repository.search_users(query, limit=limit)
+        
+        result = []
+        for user in users:
+            result.append({
+                'id': user.id,
+                'username': user.username,
+                'email_verified': getattr(user, 'email_verified', False),
+            })
+        
+        return result

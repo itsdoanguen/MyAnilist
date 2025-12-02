@@ -194,3 +194,27 @@ class UserRepository:
             bool: True if username exists, False otherwise
         """
         return User.objects.filter(username=username).exists()
+    
+    @staticmethod
+    def search_users(query: str, limit: int = 20) -> list:
+        """
+        Search users by username (case-insensitive partial match)
+        
+        Args:
+            query: Search query string
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of User instances matching the query
+        """
+        if not query or len(query.strip()) == 0:
+            return []
+        
+        query = query.strip()
+        
+        # Search by username (case-insensitive contains)
+        users = User.objects.filter(
+            username__icontains=query
+        ).order_by('username')[:limit]
+        
+        return list(users)

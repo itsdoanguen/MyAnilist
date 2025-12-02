@@ -104,4 +104,48 @@ def user_anime_list(request, username):
 		return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
 	except Exception:
 		return Response({'error': 'Error fetching user anime list'}, status=status.HTTP_502_BAD_GATEWAY)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def search_users(request):
+	"""Search users by username.
+
+	Query params:
+	- q: Search query string (required, min 2 characters)
+	- limit: Maximum number of results (default 20, max 50)
+
+	Response: {
+	  "query": "search_term",
+	  "count": 5,
+	  "results": [
+		{"id": 1, "username": "user1", "email_verified": true},
+		...
+	  ]
+	}
+	"""
+	query = request.query_params.get('q', '').strip()
+	limit_q = request.query_params.get('limit')
+
+	if not query:
+		return Response({'error': 'Query parameter "q" is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+	if len(query) < 2:
+		return Response({'error': 'Query must be at least 2 characters long'}, status=status.HTTP_400_BAD_REQUEST)
+
+	try:
+		limit = int(limit_q) if limit_q else 20
+		limit = min(max(1, limit), 50)  # Clamp between 1 and 50
+	except ValueError:
+		return Response({'error': 'limit must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+	try:
+		results = service.search_users(query, limit=limit)
+		return Response({
+			'query': query,
+			'count': len(results),
+			'results': results
+		}, status=status.HTTP_200_OK)
+	except Exception as e:
+		return Response({'error': 'Error searching users'}, status=status.HTTP_502_BAD_GATEWAY)
 	
