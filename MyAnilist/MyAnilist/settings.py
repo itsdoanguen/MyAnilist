@@ -81,10 +81,9 @@ SIMPLE_JWT = {
 }
 
 #frontend local host
-# CORS_ALLOWED_ORIGINS = [
-#   "http://localhost:3000",
-#   "http://]
-CORS_ALLOWED_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
 
 WSGI_APPLICATION = 'MyAnilist.wsgi.application'
 
