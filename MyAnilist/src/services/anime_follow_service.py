@@ -85,6 +85,7 @@ class AnimeFollowService:
                 'anilist_id': f.anilist_id,
                 'episode_progress': f.episode_progress,
                 'watch_status': f.watch_status,
+                'isFavorite': f.isFavorite,
             }
 
             anime_data = anime_data_map.get(f.anilist_id)
