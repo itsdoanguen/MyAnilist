@@ -5,6 +5,7 @@ from .notification import NotificationLog
 from .list import List, UserList, AnimeList, ListJoinRequest
 from .email_verification import EmailVerification
 from .user_activity import UserActivity
+from .list_like import ListLike
 
 __all__ = [
     'User',
@@ -17,4 +18,5 @@ __all__ = [
     'AnimeList',
     'ListJoinRequest',
     'UserActivity',
+    'ListLike',
 ]

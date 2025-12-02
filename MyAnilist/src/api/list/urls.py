@@ -5,6 +5,10 @@ from .user_list_views import (
     join_request_create, join_request_list, join_request_respond, check_user_status
 )
 from .anime_list_views import anime_add, anime_list_get, anime_note_update, anime_remove
+from .list_like_views import (
+    list_like_toggle, list_like_status, list_likers_get, 
+    user_liked_lists_get, trending_lists_get, most_liked_lists_get
+)
 
 urlpatterns = [
     # List CRUD
@@ -12,6 +16,14 @@ urlpatterns = [
     path('user/', user_lists_get, name='user_lists_get'),
     path('<int:list_id>/update/', list_update, name='list_update'),
     path('<int:list_id>/delete/', list_delete, name='list_delete'),
+    
+    # List Like
+    path('<int:list_id>/like/', list_like_toggle, name='list_like_toggle'),
+    path('<int:list_id>/like/status/', list_like_status, name='list_like_status'),
+    path('<int:list_id>/likers/', list_likers_get, name='list_likers_get'),
+    path('likes/user/', user_liked_lists_get, name='user_liked_lists_get'),
+    path('likes/trending/', trending_lists_get, name='trending_lists_get'),
+    path('likes/most-liked/', most_liked_lists_get, name='most_liked_lists_get'),
     
     # Member management
     path('member/<int:list_id>/add/', member_add, name='member_add'),
