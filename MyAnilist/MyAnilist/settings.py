@@ -84,7 +84,7 @@ SIMPLE_JWT = {
 # CORS_ALLOWED_ORIGINS = [
 #   "http://localhost:3000",
 #   "http://]
-CORS_ALLOW_ORIGINS = True
+CORS_ALLOWED_ORIGINS = True
 
 WSGI_APPLICATION = 'MyAnilist.wsgi.application'
 
