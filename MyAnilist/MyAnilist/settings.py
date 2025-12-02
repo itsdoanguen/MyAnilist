@@ -41,8 +41,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
+    # 'corsheaders.middleware.CorsMiddleware',
+    # 'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'MyAnilist.urls'
@@ -81,9 +81,10 @@ SIMPLE_JWT = {
 }
 
 #frontend local host
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-]
+# CORS_ALLOWED_ORIGINS = [
+#   "http://localhost:3000",
+#   "http://]
+CORS_ALLOW_ALL_ORIGINS = True
 
 WSGI_APPLICATION = 'MyAnilist.wsgi.application'
 
@@ -183,3 +184,5 @@ LOGGING = {
         },
     },
 }
+
+STATIC_ROOT = BASE_DIR / 'staticfiles'
