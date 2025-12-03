@@ -7,6 +7,7 @@ from .anilist_querys import (
     ANIME_INFO_QS,
     ANIME_INFO_LIGHTWEIGHT_QS,
     ANIME_BATCH_INFO_QS,
+    ANIME_COVERS_BATCH_QS,
     ANIME_CHARACTERS_QS, 
     ANIME_STAFF_QS, 
     ANIME_STATS_QS, 
@@ -324,3 +325,61 @@ class AnimeRepository:
             raise RuntimeError(data['errors'])
 
         return data.get('data', {}).get('Media', {}).get('streamingEpisodes', [])
+    
+    def fetch_anime_covers_batch(self, anime_ids: List[int]) -> dict:
+        """
+        Fetch only cover images for multiple anime in a single API request (up to 50 anime).
+        This is optimized for getting just covers without other anime data.
+        
+        Args:
+            anime_ids: List of AniList anime IDs (max 50)
+            
+        Returns:
+            Dictionary mapping anime_id -> cover_image_url
+            
+        Raises:
+            RuntimeError: If API request fails or returns errors
+        """
+        if not anime_ids:
+            return {}
+        
+        if len(anime_ids) > 50:
+            logger.warning(f'fetch_anime_covers_batch called with {len(anime_ids)} IDs, will only fetch first 50')
+            anime_ids = anime_ids[:50]
+        
+        start_time = time.time()
+        payload = {'query': ANIME_COVERS_BATCH_QS, 'variables': {'ids': anime_ids}}
+        
+        try:
+            request_start = time.time()
+            resp = requests.post(self.ANILIST_ENDPOINT, json=payload, timeout=15)
+            request_duration = time.time() - request_start
+            resp.raise_for_status()
+            
+            parse_start = time.time()
+            data = resp.json()
+            parse_duration = time.time() - parse_start
+            
+            total_duration = time.time() - start_time
+            logger.info(f'[API] fetch_anime_covers_batch({len(anime_ids)} covers): total={total_duration:.3f}s, request={request_duration:.3f}s, parse={parse_duration:.3f}s')
+            
+        except requests.exceptions.HTTPError as e:
+            duration = time.time() - start_time
+            body = e.response.text if getattr(e, 'response', None) is not None else str(e)
+            logger.warning(f'[API] fetch_anime_covers_batch FAILED after {duration:.3f}s: status=%s body=%s', 
+                        getattr(e.response, 'status_code', None), body)
+            raise RuntimeError(body)
+        
+        if 'errors' in data:
+            logger.warning('AniList covers batch query returned errors: %s', data['errors'])
+            raise RuntimeError(data['errors'])
+        
+        media_list = data.get('data', {}).get('Page', {}).get('media', [])
+        result = {}
+        for anime in media_list:
+            if anime and 'id' in anime:
+                cover_url = (anime.get('coverImage') or {}).get('large')
+                result[anime['id']] = cover_url
+        
+        logger.debug(f'[API] fetch_anime_covers_batch: requested {len(anime_ids)}, received {len(result)}')
+        return result

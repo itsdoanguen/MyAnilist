@@ -44,6 +44,17 @@ query ($id: Int) {
 }
 '''
 
+ANIME_COVERS_BATCH_QS = '''
+query ($ids: [Int]) {
+  Page(page: 1, perPage: 50) {
+    media(id_in: $ids, type: ANIME) {
+      id
+      coverImage { large }
+    }
+  }
+}
+'''
+
 ANIME_ID_SEARCH_QS = '''
 query ($query: String, $page: Int, $perpage: Int) {
     Page (page: $page, perPage: $perpage) {

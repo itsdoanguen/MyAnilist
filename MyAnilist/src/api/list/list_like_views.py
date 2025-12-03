@@ -4,9 +4,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.core.exceptions import ValidationError
 
-from src.services.list_service import ListService
+from src.services.list_like_service import ListLikeService
 
-list_service = ListService()
+list_like_service = ListLikeService()
 logger = __import__('logging').getLogger(__name__)
 
 
@@ -30,7 +30,7 @@ def list_like_toggle(request, list_id):
     try:
         auth_user = request.user
         
-        result = list_service.toggle_list_like(user=auth_user, list_id=list_id)
+        result = list_like_service.toggle_list_like(user=auth_user, list_id=list_id)
         
         return Response(result, status=status.HTTP_200_OK)
         
@@ -60,7 +60,7 @@ def list_like_status(request, list_id):
     try:
         auth_user = request.user if request.user.is_authenticated else None
         
-        result = list_service.get_list_like_status(user=auth_user, list_id=list_id)
+        result = list_like_service.get_list_like_status(user=auth_user, list_id=list_id)
         
         return Response(result, status=status.HTTP_200_OK)
         
@@ -98,7 +98,7 @@ def list_likers_get(request, list_id):
         except (ValueError, TypeError):
             return Response({'error': 'limit must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
         
-        result = list_service.get_list_likers(list_id=list_id, limit=limit)
+        result = list_like_service.get_list_likers(list_id=list_id, limit=limit)
         
         return Response(result, status=status.HTTP_200_OK)
         
@@ -148,7 +148,7 @@ def user_liked_lists_get(request):
         
         requester = request.user if request.user.is_authenticated else None
         
-        result = list_service.get_user_liked_lists(
+        result = list_like_service.get_user_liked_lists(
             username=username,
             requester=requester,
             limit=limit,
@@ -187,7 +187,7 @@ def trending_lists_get(request):
         except (ValueError, TypeError):
             return Response({'error': 'limit must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
         
-        result = list_service.get_trending_lists(limit=limit)
+        result = list_like_service.get_trending_lists(limit=limit)
         
         return Response(result, status=status.HTTP_200_OK)
         
@@ -219,7 +219,7 @@ def most_liked_lists_get(request):
         except (ValueError, TypeError):
             return Response({'error': 'limit must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
         
-        result = list_service.get_most_liked_lists(limit=limit)
+        result = list_like_service.get_most_liked_lists(limit=limit)
         
         return Response(result, status=status.HTTP_200_OK)
         

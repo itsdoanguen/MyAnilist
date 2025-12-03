@@ -324,3 +324,34 @@ class AnimeService:
                 'site': link.get('site')
             })
         return result
+    
+    def get_anime_covers(self, anime_ids: List[int]) -> dict:
+        """
+        Get cover images for multiple anime IDs using batch API call.
+        
+        Args:
+            anime_ids: List of anime IDs to fetch covers for
+            
+        Returns:
+            Dictionary mapping anime_id to cover_image_url
+            Example: {12345: 'https://...', 67890: 'https://...'}
+        """
+        if not anime_ids:
+            return {}
+        
+        result = {}
+        
+        # Process in batches of 50 (AniList API limit)
+        for i in range(0, len(anime_ids), 50):
+            batch = anime_ids[i:i + 50]
+            try:
+                batch_covers = self.repo.fetch_anime_covers_batch(batch)
+                result.update(batch_covers)
+            except Exception:
+                logger.exception('Failed to fetch covers batch starting at index %s', i)
+                # Fill in None for failed batch
+                for anime_id in batch:
+                    if anime_id not in result:
+                        result[anime_id] = None
+        
+        return result
