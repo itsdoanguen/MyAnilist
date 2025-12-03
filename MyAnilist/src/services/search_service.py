@@ -103,9 +103,8 @@ class SearchService:
         # normalize defaults
         if genres is None:
             genres = []
-        if year is None:
-            year = current_year 
-
+        if sort is None:
+            sort = 'POPULARITY_DESC'
         try:
             media_list = self.repo.fetch_media_by_criteria(
                 genres=genres, 
