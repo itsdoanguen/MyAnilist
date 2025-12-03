@@ -1,5 +1,5 @@
 from django.urls import path
-from .list_views import list_create, list_get, user_lists_get, list_update, list_delete
+from .list_views import list_create, list_get, user_lists_get, list_update, list_delete, public_lists_get, public_lists_search, list_copy
 from .user_list_views import (
     member_add, member_list, member_remove, member_permission_update, 
     join_request_create, join_request_list, join_request_respond, check_user_status
@@ -14,6 +14,9 @@ urlpatterns = [
     # List CRUD
     path('create/', list_create, name='list_create'),
     path('user/', user_lists_get, name='user_lists_get'),
+    path('public/', public_lists_get, name='public_lists_get'),
+    path('search/', public_lists_search, name='public_lists_search'),
+    path('<int:list_id>/copy/', list_copy, name='list_copy'),
     path('<int:list_id>/update/', list_update, name='list_update'),
     path('<int:list_id>/delete/', list_delete, name='list_delete'),
     

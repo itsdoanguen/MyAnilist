@@ -185,6 +185,59 @@ class ListRepository:
             return False
     
     @staticmethod
+    def get_anime_items_in_list(list_id: int):
+        """
+        Get all anime items in a list.
+
+        Args:
+            list_id: ID of the list
+
+        Returns:
+            QuerySet of AnimeList instances
+        """
+        from src.models.list import AnimeList
+
+        return AnimeList.objects.filter(list_id=list_id).order_by('added_date')
+    
+    @staticmethod
+    def copy_anime_to_list(source_list_id: int, target_list_id: int, user):
+        """
+        Copy all anime items from source list to target list.
+
+        Args:
+            source_list_id: ID of the source list
+            target_list_id: ID of the target list
+            user: User who is copying (will be set as added_by)
+
+        Returns:
+            Number of anime items copied
+        """
+        from src.models.list import AnimeList
+
+        # Get all anime from source list
+        source_anime = AnimeList.objects.filter(list_id=source_list_id)
+        
+        # Create copies in target list
+        copied_count = 0
+        for anime in source_anime:
+            # Check if anime already exists in target list
+            exists = AnimeList.objects.filter(
+                list_id=target_list_id,
+                anilist_id=anime.anilist_id
+            ).exists()
+            
+            if not exists:
+                AnimeList.objects.create(
+                    list_id=target_list_id,
+                    anilist_id=anime.anilist_id,
+                    added_by=user,
+                    note=anime.note  # Copy note from original
+                )
+                copied_count += 1
+        
+        return copied_count
+    
+    @staticmethod
     def check_user_liked_list(user, list_id: int) -> bool:
         """
         Check if a user has liked a list.
@@ -342,3 +395,72 @@ class ListRepository:
         )
         
         return list(most_liked)
+    
+    @staticmethod
+    def get_public_lists(limit: int = 20, offset: int = 0):
+        """
+        Get all public lists with pagination.
+
+        Args:
+            limit: Maximum number of lists to return
+            offset: Offset for pagination
+
+        Returns:
+            Dictionary with total count and list of List instances
+        """
+        from src.models.list import List
+        from django.db.models import Count
+
+        # Get total count of public lists
+        total = List.objects.filter(isPrivate=False).count()
+        
+        # Get public lists with like count annotation
+        lists_qs = (
+            List.objects
+            .filter(isPrivate=False)
+            .annotate(like_count=Count('likes'))
+            .order_by('-created_at')[offset:offset + limit]
+        )
+        
+        return {
+            'total': total,
+            'lists': list(lists_qs)
+        }
+    
+    @staticmethod
+    def search_public_lists(query: str, limit: int = 20, offset: int = 0):
+        """
+        Search public lists by name and description.
+
+        Args:
+            query: Search query string
+            limit: Maximum number of lists to return
+            offset: Offset for pagination
+
+        Returns:
+            Dictionary with total count and list of matching List instances
+        """
+        from src.models.list import List
+        from django.db.models import Count, Q
+
+        # Search in list_name or description (case-insensitive)
+        filter_query = Q(isPrivate=False)
+        if query:
+            filter_query &= (Q(list_name__icontains=query) | Q(description__icontains=query))
+        
+        # Get total count
+        total = List.objects.filter(filter_query).count()
+        
+        # Get lists with like count annotation
+        lists_qs = (
+            List.objects
+            .filter(filter_query)
+            .annotate(like_count=Count('likes'))
+            .order_by('-created_at')[offset:offset + limit]
+        )
+        
+        return {
+            'total': total,
+            'lists': list(lists_qs),
+            'query': query
+        }

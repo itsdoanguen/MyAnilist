@@ -186,3 +186,155 @@ def list_get(request, anilist_id):
     provided, uses authenticated user (requires auth).
     """
     return Response({'message': 'list_get not implemented yet'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def public_lists_get(request):
+    """Get all public lists with pagination.
+    
+    Body params:
+    - limit (optional, default=20, max=50): Number of lists per page
+    - offset (optional, default=0): Offset for pagination
+    
+    Returns:
+    - total: Total number of public lists
+    - offset: Current offset
+    - limit: Items per page
+    - showing: Number of lists in current page
+    - has_more: Whether there are more lists to load
+    - lists: Array of public list objects with like count
+    """
+    try:
+        data = request.data or {}
+        
+        limit = data.get('limit', 20)
+        offset = data.get('offset', 0)
+        
+        # Validate types
+        try:
+            limit = int(limit)
+            offset = int(offset)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'limit and offset must be integers'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get public lists
+        result = list_service.get_all_public_lists(limit=limit, offset=offset)
+        
+        return Response(result, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.exception('Error in public_lists_get: %s', e)
+        return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def public_lists_search(request):
+    """Search public lists by name and description.
+    
+    Body params:
+    - query (required): Search query string (searches in both list name and description)
+    - limit (optional, default=20, max=50): Number of lists per page
+    - offset (optional, default=0): Offset for pagination
+    
+    Returns:
+    - query: The search query used
+    - total: Total number of matching lists
+    - offset: Current offset
+    - limit: Items per page
+    - showing: Number of lists in current page
+    - has_more: Whether there are more results to load
+    - lists: Array of matching public list objects with like count
+    """
+    try:
+        data = request.data or {}
+        
+        query = data.get('query', '').strip()
+        limit = data.get('limit', 20)
+        offset = data.get('offset', 0)
+        
+        # Validate query
+        if not query:
+            return Response(
+                {'error': 'query parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate types
+        try:
+            limit = int(limit)
+            offset = int(offset)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'limit and offset must be integers'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Search lists
+        result = list_service.search_public_lists(query=query, limit=limit, offset=offset)
+        
+        return Response(result, status=status.HTTP_200_OK)
+        
+    except ValidationError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception('Error in public_lists_search: %s', e)
+        return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def list_copy(request, list_id):
+    """Create a copy of an existing list.
+    
+    Path params:
+    - list_id: ID of the list to copy
+    
+    Body params:
+    - list_name (optional): Name for the new list (defaults to "Copy of [original name]")
+    - description (optional): Description for the new list (copies from original if not provided)
+    - is_private (optional, default=True): Privacy setting for the new list
+    
+    Permission requirements:
+    - User must be authenticated
+    - Can copy public lists
+    - Can copy private lists only if user has access (is a member)
+    
+    Returns:
+    - New list details
+    - Number of anime items copied
+    - Source list information
+    """
+    try:
+        auth_user = request.user
+        data = request.data or {}
+        
+        # Get optional parameters
+        new_list_name = data.get('list_name', '').strip() or None
+        new_description = data.get('description', '').strip() if 'description' in data else None
+        is_private = data.get('is_private', True)
+        
+        # Validate is_private type
+        if not isinstance(is_private, bool):
+            is_private = str(is_private).lower() == 'true'
+        
+        # Copy the list
+        result = list_service.copy_list(
+            user=auth_user,
+            source_list_id=list_id,
+            new_list_name=new_list_name,
+            new_description=new_description,
+            is_private=is_private
+        )
+        
+        return Response(result, status=status.HTTP_201_CREATED)
+        
+    except ValidationError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception('Error in list_copy: %s', e)
+        return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

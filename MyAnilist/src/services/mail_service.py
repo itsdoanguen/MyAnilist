@@ -29,6 +29,7 @@ class MailService:
 			backend_url = getattr(settings, 'BASE_URL', 'https://doannguyen.pythonanywhere.com')
 			verify_path = reverse('auth_verify_email')
 			backend_verify_url = f"{backend_url}{verify_path}?token={token}"
+			logger.debug(f"Verification URLs: frontend={frontend_verify_url}, backend={backend_verify_url}")
 
 			body = (
 				f"Hi {user.username},\n\n"

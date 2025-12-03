@@ -521,3 +521,178 @@ class ListService:
             'total': len(top_lists),
             'most_liked_lists': top_lists,
         }
+    
+    def get_all_public_lists(self, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
+        """
+        Get all public lists with pagination.
+
+        Args:
+            limit: Maximum number of lists to return (default: 20, max: 50)
+            offset: Offset for pagination (default: 0)
+
+        Returns:
+            Dictionary containing paginated public lists
+        """
+        # Validate pagination params
+        limit = min(max(1, limit), 50)
+        offset = max(0, offset)
+        
+        # Get public lists
+        result = self.repo.get_public_lists(limit=limit, offset=offset)
+        
+        # Format response
+        lists = []
+        for lst in result['lists']:
+            lists.append({
+                'list_id': lst.list_id,
+                'list_name': lst.list_name,
+                'description': lst.description,
+                'color': lst.color,
+                'created_at': lst.created_at.isoformat() if lst.created_at else None,
+                'updated_at': lst.updated_at.isoformat() if lst.updated_at else None,
+                'like_count': lst.like_count,
+            })
+        
+        return {
+            'total': result['total'],
+            'offset': offset,
+            'limit': limit,
+            'showing': len(lists),
+            'has_more': (offset + len(lists)) < result['total'],
+            'lists': lists,
+        }
+    
+    def search_public_lists(self, query: str, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
+        """
+        Search public lists by name and description.
+
+        Args:
+            query: Search query string
+            limit: Maximum number of lists to return (default: 20, max: 50)
+            offset: Offset for pagination (default: 0)
+
+        Returns:
+            Dictionary containing search results
+        """
+        # Validate pagination params
+        limit = min(max(1, limit), 50)
+        offset = max(0, offset)
+        
+        # Validate query
+        if not query or not query.strip():
+            raise ValidationError('Search query cannot be empty')
+        
+        query = query.strip()
+        
+        # Search lists
+        result = self.repo.search_public_lists(query=query, limit=limit, offset=offset)
+        
+        # Format response
+        lists = []
+        for lst in result['lists']:
+            lists.append({
+                'list_id': lst.list_id,
+                'list_name': lst.list_name,
+                'description': lst.description,
+                'color': lst.color,
+                'created_at': lst.created_at.isoformat() if lst.created_at else None,
+                'updated_at': lst.updated_at.isoformat() if lst.updated_at else None,
+                'like_count': lst.like_count,
+            })
+        
+        return {
+            'query': query,
+            'total': result['total'],
+            'offset': offset,
+            'limit': limit,
+            'showing': len(lists),
+            'has_more': (offset + len(lists)) < result['total'],
+            'lists': lists,
+        }
+    
+    def copy_list(self, user, source_list_id: int, new_list_name: str = None, 
+                  new_description: str = None, is_private: bool = True) -> Dict[str, Any]:
+        """
+        Create a copy of an existing list for the user.
+
+        Args:
+            user: User who is copying the list
+            source_list_id: ID of the list to copy
+            new_list_name: Name for the new list (optional, defaults to "Copy of [original name]")
+            new_description: Description for the new list (optional, copies from original)
+            is_private: Privacy setting for the new list (default: True)
+
+        Returns:
+            Dictionary containing the new list details and copy statistics
+
+        Raises:
+            ValidationError: If list not found or not accessible
+        """
+        # Get source list
+        source_list = self.repo.get_details_of_list(source_list_id)
+        if not source_list:
+            raise ValidationError('List not found')
+        
+        # Check if user can access the source list
+        # Can copy if: list is public OR user has access to private list
+        if source_list.isPrivate:
+            user_list = self.repo.get_user_list_by_user_and_list(user, source_list_id)
+            if not user_list:
+                raise ValidationError('You do not have access to this private list')
+        
+        # Prepare new list details
+        if not new_list_name:
+            new_list_name = f"Copy of {source_list.list_name}"
+        
+        if new_description is None:
+            new_description = source_list.description
+        
+        # Validate new list name
+        if not new_list_name.strip():
+            raise ValidationError('List name cannot be empty')
+        
+        if len(new_list_name) > 255:
+            raise ValidationError('List name cannot exceed 255 characters')
+        
+        try:
+            # Create the new list
+            new_list = self.repo.create_list(
+                list_name=new_list_name.strip(),
+                description=new_description.strip() if new_description else '',
+                is_private=is_private,
+                color=source_list.color  # Copy color from original
+            )
+            
+            # Link user as owner
+            user_list = self.repo.create_user_list(
+                user=user,
+                list_obj=new_list,
+                is_owner=True,
+                can_edit=True
+            )
+            
+            # Copy all anime items
+            anime_copied = self.repo.copy_anime_to_list(
+                source_list_id=source_list_id,
+                target_list_id=new_list.list_id,
+                user=user
+            )
+            
+            return {
+                'list_id': new_list.list_id,
+                'list_name': new_list.list_name,
+                'description': new_list.description,
+                'is_private': new_list.isPrivate,
+                'color': new_list.color,
+                'created_at': new_list.created_at.isoformat() if new_list.created_at else None,
+                'is_owner': user_list.is_owner,
+                'can_edit': user_list.can_edit,
+                'copied_from': {
+                    'list_id': source_list.list_id,
+                    'list_name': source_list.list_name,
+                },
+                'anime_copied': anime_copied,
+            }
+        except Exception as e:
+            logger.exception('Error copying list %s for user %s: %s', source_list_id, user.username, e)
+            raise
