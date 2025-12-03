@@ -176,6 +176,30 @@ class UserListService:
         if not removed:
             raise ValidationError(f'User {member.username} is not a member of this list')
 
+        # Auto-reject any pending edit_permission requests from this member
+        try:
+            pending_edit_requests = self.user_list_repo.get_pending_request(
+                user=member,
+                list_id=list_id,
+                request_type='edit_permission'
+            )
+            for request in pending_edit_requests:
+                self.user_list_repo.update_request_status(
+                    request_id=request.request_id,
+                    status='rejected',
+                    responded_by=owner
+                )
+                logger.info(
+                    'Auto-rejected edit_permission request %s when removing member %s from list %s',
+                    request.request_id, member.username, list_id
+                )
+        except Exception as e:
+            # Don't fail the remove operation if auto-reject fails
+            logger.warning(
+                'Failed to auto-reject edit_permission requests when removing member %s from list %s: %s',
+                member.username, list_id, e
+            )
+
         return True
 
     def update_member_permissions(self, owner, list_id: int, member, can_edit: bool) -> Dict[str, Any]:
@@ -439,12 +463,20 @@ class UserListService:
                     permission_level = 'edit' if can_edit else 'view'
                 
                 elif join_request.request_type == 'edit_permission':
+                    # Check if user is still a member before granting edit permission
+                    existing_membership = self.user_list_repo.get_user_list(join_request.user, list_id)
+                    if not existing_membership:
+                        raise ValidationError(f'User {join_request.user.username} is no longer a member of this list. Cannot grant edit permission.')
+                    
                     # Update existing member to editor
                     user_list = self.user_list_repo.update_member_permissions(
                         user=join_request.user,
                         list_id=list_id,
                         can_edit=True
                     )
+                    if not user_list:
+                        raise ValidationError(f'Failed to update permissions for {join_request.user.username}')
+                    
                     final_can_edit = True
                     permission_level = 'edit'
                 
