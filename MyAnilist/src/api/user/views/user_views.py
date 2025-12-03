@@ -1,7 +1,7 @@
 from datetime import date
 
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -151,7 +151,7 @@ def search_users(request):
 
 
 @api_view(['POST'])
-@permission_classes(['rest_framework.permissions.IsAuthenticated'])
+@permission_classes([IsAuthenticated])
 def upload_avatar(request):
 	"""Upload user avatar image.
 	
@@ -186,7 +186,7 @@ def upload_avatar(request):
 
 
 @api_view(['DELETE'])
-@permission_classes(['rest_framework.permissions.IsAuthenticated'])
+@permission_classes([IsAuthenticated])
 def delete_avatar(request):
 	"""Delete user avatar image.
 	
@@ -247,7 +247,7 @@ def get_user_profile(request, username):
 
 
 @api_view(['PUT', 'PATCH'])
-@permission_classes(['rest_framework.permissions.IsAuthenticated'])
+@permission_classes([IsAuthenticated])
 def update_user_profile(request):
 	"""Update user profile information.
 	
