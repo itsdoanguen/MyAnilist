@@ -20,6 +20,7 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1'] if not DEBUG else ['*']
 # Base URL for the application
 BASE_URL = os.getenv('BASE_URL', 'https://doannguyen.pythonanywhere.com')
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+FRONTEND_PRODUCTION_URL = 'https://my-animelist-front.vercel.app'
 
 
 # Application definition
@@ -84,10 +85,13 @@ SIMPLE_JWT = {
     'ALGORITHM': 'HS256',
 }
 
-#frontend local host
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
+    "http://localhost:3000",  # Local development
+    "https://my-animelist-front.vercel.app",  # Production
 ]
+
+# Allow credentials for authenticated requests
+CORS_ALLOW_CREDENTIALS = True
 
 WSGI_APPLICATION = 'MyAnilist.wsgi.application'
 

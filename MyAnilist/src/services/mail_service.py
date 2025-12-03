@@ -22,7 +22,12 @@ class MailService:
 			subject = 'Verify your MyAnilist account'
 			
 			# Frontend URL (primary verification link)
-			frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+			# Use production URL if not in DEBUG mode, otherwise use local/env URL
+			if not getattr(settings, 'DEBUG', False):
+				frontend_url = getattr(settings, 'FRONTEND_PRODUCTION_URL', 'https://my-animelist-front.vercel.app')
+			else:
+				frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+			
 			frontend_verify_url = f"{frontend_url}/verify-email?token={token}"
 			
 			# Backend URL (backup verification link)
