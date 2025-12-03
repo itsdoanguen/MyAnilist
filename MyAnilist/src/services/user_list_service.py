@@ -63,6 +63,19 @@ class UserListService:
                 is_owner=False,
                 can_edit=can_edit
             )
+            
+            # Auto-approve any pending join request from this user
+            pending_join_request = self.user_list_repo.get_pending_request(member, list_id, 'join')
+            if pending_join_request:
+                try:
+                    self.user_list_repo.update_request_status(
+                        request_id=pending_join_request.request_id,
+                        status='approved',
+                        responded_by=owner
+                    )
+                    logger.info(f'Auto-approved pending join request {pending_join_request.request_id} when adding member {member.username} to list {list_id}')
+                except Exception as e:
+                    logger.warning(f'Failed to auto-approve join request: {e}')
 
             return {
                 'user_id': member.pk,
@@ -73,6 +86,7 @@ class UserListService:
                 'can_edit': user_list.can_edit,
                 'joined_at': user_list.joined_at.isoformat() if user_list.joined_at else None,
                 'permission_level': 'edit' if can_edit else 'view',
+                'auto_approved_request': pending_join_request is not None,
             }
         except IntegrityError as e:
             logger.exception('Error adding member to list %s: %s', list_id, e)
@@ -202,6 +216,22 @@ class UserListService:
         updated = self.user_list_repo.update_member_permissions(member, list_id, can_edit)
         if not updated:
             raise ValidationError('Failed to update member permissions')
+        
+        # Auto-approve any pending edit permission request if granting edit access
+        auto_approved_request = False
+        if can_edit:
+            pending_edit_request = self.user_list_repo.get_pending_request(member, list_id, 'edit_permission')
+            if pending_edit_request:
+                try:
+                    self.user_list_repo.update_request_status(
+                        request_id=pending_edit_request.request_id,
+                        status='approved',
+                        responded_by=owner
+                    )
+                    auto_approved_request = True
+                    logger.info(f'Auto-approved pending edit permission request {pending_edit_request.request_id} when updating permissions for {member.username} in list {list_id}')
+                except Exception as e:
+                    logger.warning(f'Failed to auto-approve edit permission request: {e}')
 
         return {
             'user_id': member.pk,
@@ -212,6 +242,7 @@ class UserListService:
             'can_edit': updated.can_edit,
             'joined_at': updated.joined_at.isoformat() if updated.joined_at else None,
             'permission_level': 'edit' if can_edit else 'view',
+            'auto_approved_request': auto_approved_request,
         }
 
     def create_join_request(self, user, list_id: int, request_type: str = 'join', message: str = '') -> Dict[str, Any]:
