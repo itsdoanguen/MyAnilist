@@ -148,4 +148,193 @@ def search_users(request):
 		}, status=status.HTTP_200_OK)
 	except Exception as e:
 		return Response({'error': 'Error searching users'}, status=status.HTTP_502_BAD_GATEWAY)
+
+
+@api_view(['POST'])
+@permission_classes(['rest_framework.permissions.IsAuthenticated'])
+def upload_avatar(request):
+	"""Upload user avatar image.
+	
+	Request:
+	- multipart/form-data with key 'avatar' containing image file
+	
+	Response:
+	{
+	  "avatar_url": "/media/avatars/2024/12/user123.jpg",
+	  "message": "Avatar updated successfully"
+	}
+	"""
+	from rest_framework.parsers import MultiPartParser, FormParser
+	from django.core.exceptions import ValidationError as DjangoValidationError
+	
+	try:
+		avatar_file = request.FILES.get('avatar')
+		
+		if not avatar_file:
+			return Response(
+				{'error': 'No avatar file provided'}, 
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		result = service.update_avatar(request.user, avatar_file)
+		return Response(result, status=status.HTTP_200_OK)
+		
+	except DjangoValidationError as e:
+		return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+	except Exception as e:
+		return Response({'error': 'Failed to upload avatar'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes(['rest_framework.permissions.IsAuthenticated'])
+def delete_avatar(request):
+	"""Delete user avatar image.
+	
+	Response:
+	{
+	  "message": "Avatar deleted successfully"
+	}
+	"""
+	try:
+		result = service.delete_avatar(request.user)
+		return Response(result, status=status.HTTP_200_OK)
+	except Exception as e:
+		return Response({'error': 'Failed to delete avatar'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_user_profile(request, username):
+	"""Get user profile with full information.
+	
+	Response includes:
+	- id, username, email (only for owner)
+	- email_verified, avatar_url
+	- first_name, last_name
+	- last_login, date_joined
+	- is_staff, is_active
+	"""
+	try:
+		user = service.get_user_by_username(username)
+		if not user:
+			return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+		
+		# Check if viewing own profile for privacy
+		is_own = request.user.is_authenticated and request.user.pk == user.pk
+		
+		response_data = {
+			'id': user.id,
+			'username': user.username,
+			'email_verified': user.email_verified,
+			'avatar_url': user.avatar_url,
+			'first_name': user.first_name,
+			'last_name': user.last_name,
+			'date_joined': user.date_joined.isoformat() if user.date_joined else None,
+			'is_staff': user.is_staff,
+			'is_active': user.is_active,
+			'is_own_profile': is_own,
+		}
+		
+		# Include sensitive info only for own profile
+		if is_own:
+			response_data['email'] = user.email
+			response_data['last_login'] = user.last_login.isoformat() if user.last_login else None
+		
+		return Response(response_data, status=status.HTTP_200_OK)
+		
+	except Exception as e:
+		return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes(['rest_framework.permissions.IsAuthenticated'])
+def update_user_profile(request):
+	"""Update user profile information.
+	
+	Body params (all optional):
+	- first_name: User's first name
+	- last_name: User's last name
+	- username: New username (must be unique)
+	
+	Response: Updated user profile
+	"""
+	try:
+		user = request.user
+		data = request.data or {}
+		
+		updated_fields = []
+		
+		# Update first_name
+		if 'first_name' in data:
+			first_name = data['first_name'].strip()
+			if len(first_name) > 150:
+				return Response(
+					{'error': 'first_name cannot exceed 150 characters'},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+			user.first_name = first_name
+			updated_fields.append('first_name')
+		
+		# Update last_name
+		if 'last_name' in data:
+			last_name = data['last_name'].strip()
+			if len(last_name) > 150:
+				return Response(
+					{'error': 'last_name cannot exceed 150 characters'},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+			user.last_name = last_name
+			updated_fields.append('last_name')
+		
+		# Update username
+		if 'username' in data:
+			new_username = data['username'].strip()
+			
+			# Validate username
+			if len(new_username) < 3:
+				return Response(
+					{'error': 'Username must be at least 3 characters long'},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+			
+			if ' ' in new_username:
+				return Response(
+					{'error': 'Username cannot contain spaces'},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+			
+			# Check if username already exists (excluding current user)
+			from src.models.user import User
+			if User.objects.filter(username=new_username).exclude(pk=user.pk).exists():
+				return Response(
+					{'error': 'Username already exists'},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+			
+			user.username = new_username
+			updated_fields.append('username')
+		
+		# Save changes
+		if updated_fields:
+			user.save(update_fields=updated_fields)
+			return Response({
+				'message': 'Profile updated successfully',
+				'updated_fields': updated_fields,
+				'user': {
+					'id': user.id,
+					'username': user.username,
+					'email': user.email,
+					'first_name': user.first_name,
+					'last_name': user.last_name,
+					'avatar_url': user.avatar_url,
+				}
+			}, status=status.HTTP_200_OK)
+		else:
+			return Response(
+				{'error': 'No fields to update'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+	except Exception as e:
+		return Response({'error': 'Failed to update profile'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 	

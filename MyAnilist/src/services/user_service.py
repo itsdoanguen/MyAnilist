@@ -293,3 +293,94 @@ class UserService:
             })
         
         return result
+    
+    def validate_avatar(self, file):
+        """
+        Validate uploaded avatar file.
+        
+        Args:
+            file: Uploaded file object
+            
+        Raises:
+            ValidationError: If validation fails
+        """
+        from django.conf import settings
+        import os
+        from PIL import Image
+        
+        # Check file size (1MB)
+        if file.size > settings.MAX_AVATAR_SIZE:
+            raise ValidationError('File size must be less than 1MB')
+        
+        # Check file extension
+        ext = os.path.splitext(file.name)[1].lower().replace('.', '')
+        if ext not in settings.ALLOWED_IMAGE_EXTENSIONS:
+            raise ValidationError(f'Only image files are allowed: {", ".join(settings.ALLOWED_IMAGE_EXTENSIONS)}')
+        
+        # Verify it's a valid image
+        try:
+            img = Image.open(file)
+            img.verify()
+        except Exception:
+            raise ValidationError('Invalid image file')
+        
+        return True
+    
+    def update_avatar(self, user, avatar_file):
+        """
+        Update user avatar with validation.
+        
+        Args:
+            user: User instance
+            avatar_file: Uploaded avatar file
+            
+        Returns:
+            Dictionary with avatar_url and message
+        """
+        import os
+        
+        # Validate file
+        self.validate_avatar(avatar_file)
+        
+        # Delete old avatar if exists
+        if user.avatar:
+            old_path = user.avatar.path
+            if os.path.isfile(old_path):
+                try:
+                    os.remove(old_path)
+                except Exception:
+                    pass
+        
+        # Save new avatar
+        user.avatar = avatar_file
+        user.save(update_fields=['avatar'])
+        
+        return {
+            'avatar_url': user.avatar_url,
+            'message': 'Avatar updated successfully'
+        }
+    
+    def delete_avatar(self, user):
+        """
+        Delete user avatar.
+        
+        Args:
+            user: User instance
+            
+        Returns:
+            Dictionary with message
+        """
+        import os
+        
+        if user.avatar:
+            avatar_path = user.avatar.path
+            if os.path.isfile(avatar_path):
+                try:
+                    os.remove(avatar_path)
+                except Exception:
+                    pass
+            user.avatar = None
+            user.save(update_fields=['avatar'])
+            return {'message': 'Avatar deleted successfully'}
+        
+        return {'message': 'No avatar to delete'}

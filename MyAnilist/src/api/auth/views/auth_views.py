@@ -160,6 +160,10 @@ def login(request):
                 'details': {'non_field_errors': ['Please verify your email before logging in.']}
             }, status=status.HTTP_403_FORBIDDEN)
         
+        # Update last login time
+        user.last_login = timezone.now()
+        user.save(update_fields=['last_login'])
+        
         # Generate tokens using service
         user_service = UserService()
         tokens = user_service._generate_tokens(user)

@@ -189,3 +189,13 @@ LOGGING = {
 }
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Media files (user uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# File upload settings
+DATA_UPLOAD_MAX_MEMORY_SIZE = 1048576  # 1MB in bytes
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1048576  # 1MB in bytes
+MAX_AVATAR_SIZE = 1 * 1024 * 1024  # 1MB
+ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
