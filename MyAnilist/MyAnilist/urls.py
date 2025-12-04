@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/anilist/', include('src.api.anilist.urls')),
     path('api/follow/', include('src.api.follow.urls')),
     path('api/list/', include('src.api.list.urls')),
+    path('api/notification/', include('src.api.notification.urls')),
 ]
 
 # Serve media files in development

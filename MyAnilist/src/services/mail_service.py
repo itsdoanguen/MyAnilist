@@ -50,3 +50,63 @@ class MailService:
 		except Exception as e:
 			logger.exception(f"Failed to send verification email to {getattr(user, 'email', None)}: {e}")
 			return False
+
+	def send_anime_airing_notification(
+		self, 
+		user, 
+		anime_title: str, 
+		episode_number: int, 
+		airing_at, 
+		hours_until_airing: int, 
+		cover_image: str = '', 
+		anilist_id: int = 0
+	) -> bool:
+		"""
+		Send notification about upcoming anime episode.
+
+		Args:
+			user: User instance
+			anime_title: Title of the anime
+			episode_number: Episode number
+			airing_at: DateTime when episode airs
+			hours_until_airing: Hours until airing
+			cover_image: URL to anime cover image
+			anilist_id: AniList anime ID
+
+		Returns:
+			True on success, False otherwise
+		"""
+		try:
+			subject = f"🎬 {anime_title} - Episode {episode_number} airs in {hours_until_airing}h!"
+			
+			airing_time = airing_at.strftime('%B %d, %Y at %H:%M')
+			frontend_url = getattr(settings, 'FRONTEND_PRODUCTION_URL', 'https://my-animelist-front.vercel.app')
+			
+			body = (
+				f"Hello {user.username},\n\n"
+				f"The next episode of \"{anime_title}\" is airing soon! 🍿\n\n"
+				f"Episode: {episode_number}\n"
+				f"Airing Time: {airing_time}\n"
+				f"Time Until Airing: {hours_until_airing} hours\n\n"
+				"Don't miss it!\n\n"
+				f"View on MyAniList: {frontend_url}/anime/{anilist_id}\n"
+				f"View on AniList: https://anilist.co/anime/{anilist_id}\n\n"
+				"---\n"
+				"You're receiving this because you're following this anime.\n"
+				f"Manage notification settings: {frontend_url}/settings/notifications\n\n"
+				"Best regards,\n"
+				"The MyAnilist Team"
+			)
+
+			email = EmailMessage(
+				subject=subject,
+				body=body,
+				from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@myanilist.com'),
+				to=[user.email]
+			)
+			email.send(fail_silently=False)
+			logger.info(f"Sent anime airing notification to {user.email} for {anime_title} Ep {episode_number}")
+			return True
+		except Exception as e:
+			logger.exception(f"Failed to send anime airing notification to {getattr(user, 'email', None)}: {e}")
+			return False
