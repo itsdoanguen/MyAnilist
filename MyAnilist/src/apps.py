@@ -5,3 +5,7 @@ class SrcConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'src'
     verbose_name = 'MyAnilist Core'
+    
+    def ready(self):
+        """Import signals when app is ready"""
+        import src.signals

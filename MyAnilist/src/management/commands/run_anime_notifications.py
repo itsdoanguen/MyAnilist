@@ -36,8 +36,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--cleanup-days',
             type=int,
-            default=1,
-            help='Delete notifications older than this many days'
+            default=0,
+            help='Delete notifications for episodes aired more than X days ago (default: 0 = delete immediately after airing)'
         )
 
     def handle(self, *args, **options):
@@ -149,17 +149,29 @@ class Command(BaseCommand):
             logger.exception(f'Send task error: {e}')
 
     def _cleanup_notifications(self, service, days):
-        """Delete old notifications"""
+        """Cancel invalid notifications and delete aired episodes"""
         try:
             result = service.cleanup_old_notifications(days)
+            cancelled = result.get('cancelled', 0)
             deleted = result.get('deleted', 0)
             
-            if deleted > 0:
+            if cancelled > 0:
                 self.stdout.write(
-                    self.style.SUCCESS(f'✓ Deleted {deleted} old notifications (older than {days} days)')
+                    self.style.WARNING(f'⚠ Cancelled {cancelled} invalid pending notifications')
                 )
-            else:
-                self.stdout.write(f'No old notifications to delete')
+            
+            if deleted > 0:
+                if days == 0:
+                    self.stdout.write(
+                        self.style.SUCCESS(f'✓ Deleted {deleted} notifications for aired episodes')
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS(f'✓ Deleted {deleted} notifications (episodes aired >{days} days ago)')
+                    )
+            
+            if cancelled == 0 and deleted == 0:
+                self.stdout.write('✓ Nothing to clean up')
             
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'Cleanup task failed: {e}'))

@@ -84,6 +84,12 @@ class AnimeNotificationRepository:
     def get_pending_notifications(limit: int = 100):
         """
         Get pending notifications that are ready to be sent.
+        
+        Only returns notifications for anime that user is still following with:
+        - notify_email set (not empty)
+        - watch_status = 'watching'
+        
+        Also automatically cancels notifications for anime that are no longer followed.
 
         Args:
             limit: Maximum number of notifications to return
@@ -92,11 +98,42 @@ class AnimeNotificationRepository:
             QuerySet of AnimeAiringNotification
         """
         from src.models.anime_notification import AnimeAiringNotification
+        from src.models.anime_follow import AnimeFollow
+        from django.db.models import Q, Exists, OuterRef
         
         now = timezone.now()
-        return AnimeAiringNotification.objects.filter(
+        
+        # Subquery to check if user still follows this anime with correct status
+        still_following = AnimeFollow.objects.filter(
+            user_id=OuterRef('user_id'),
+            anilist_id=OuterRef('anilist_id'),
+            watch_status='watching'
+        ).exclude(
+            notify_email=''
+        )
+        
+        # Get all pending notifications that should be sent
+        pending_notifications = AnimeAiringNotification.objects.filter(
             status='pending',
             notify_at__lte=now
+        ).annotate(
+            is_still_following=Exists(still_following)
+        )
+        
+        # Auto-cancel notifications for anime no longer being watched
+        invalid_notifications = pending_notifications.filter(is_still_following=False)
+        cancelled_count = invalid_notifications.update(
+            status='cancelled',
+            updated_at=now,
+            error_message='User no longer following or watch_status changed'
+        )
+        
+        if cancelled_count > 0:
+            logger.info(f"Auto-cancelled {cancelled_count} notifications for unfollowed/completed anime")
+        
+        # Return only valid notifications
+        return pending_notifications.filter(
+            is_still_following=True
         ).select_related('user')[:limit]
 
     @staticmethod
@@ -149,25 +186,34 @@ class AnimeNotificationRepository:
     @staticmethod
     def delete_old_notifications(days: int = 30):
         """
-        Delete notifications for episodes that have already aired.
+        Delete old notifications that are no longer needed.
         
         Deletes notifications where:
-        - airing_at (episode air date) is in the past
-        - Optional: Keep recent notifications within 'days' parameter
+        1. Status is 'cancelled' - Delete immediately (no airing_at check)
+        2. Status is 'sent' AND airing_at is older than 'days' parameter
+        
+        Does NOT delete 'pending' or 'failed' notifications.
 
         Args:
-            days: Keep notifications for episodes aired within this many days (default 30)
-                  Set to 0 to delete all aired episodes immediately
+            days: Keep 'sent' notifications for episodes aired within this many days (default 30)
+                  Set to 0 to delete immediately after episode airs
+                  Does NOT affect 'cancelled' (always deleted)
 
         Returns:
             Number of deleted notifications
         """
         from src.models.anime_notification import AnimeAiringNotification
+        from django.db.models import Q
         
         cutoff_date = timezone.now() - timezone.timedelta(days=days)
+        
+        # Delete cancelled notifications (regardless of airing_at)
+        # AND sent notifications for aired episodes
         deleted_count = AnimeAiringNotification.objects.filter(
-            airing_at__lt=cutoff_date
+            Q(status='cancelled') | 
+            Q(status='sent', airing_at__lt=cutoff_date)
         ).delete()[0]
+        
         return deleted_count
 
     @staticmethod
@@ -221,3 +267,49 @@ class AnimeNotificationRepository:
             status='pending'
         ).update(status='cancelled', updated_at=timezone.now())
         return updated
+
+    @staticmethod
+    def cancel_invalid_notifications():
+        """
+        Cancel all pending notifications for anime that are no longer being watched.
+        
+        Checks all pending notifications and cancels those where:
+        - User no longer follows the anime
+        - User's watch_status is not 'watching' (completed, dropped, on_hold, etc.)
+        - User's notify_email is empty
+
+        Returns:
+            Number of cancelled notifications
+        """
+        from src.models.anime_notification import AnimeAiringNotification
+        from src.models.anime_follow import AnimeFollow
+        from django.db.models import Exists, OuterRef
+        
+        # Subquery to check if user still follows this anime with correct status
+        still_following = AnimeFollow.objects.filter(
+            user_id=OuterRef('user_id'),
+            anilist_id=OuterRef('anilist_id'),
+            watch_status='watching'
+        ).exclude(
+            notify_email=''
+        )
+        
+        # Find and cancel invalid notifications
+        invalid_notifications = AnimeAiringNotification.objects.filter(
+            status='pending'
+        ).annotate(
+            is_still_following=Exists(still_following)
+        ).filter(
+            is_still_following=False
+        )
+        
+        cancelled_count = invalid_notifications.update(
+            status='cancelled',
+            updated_at=timezone.now(),
+            error_message='User no longer following or watch_status changed'
+        )
+        
+        if cancelled_count > 0:
+            logger.info(f"Cancelled {cancelled_count} invalid pending notifications")
+        
+        return cancelled_count

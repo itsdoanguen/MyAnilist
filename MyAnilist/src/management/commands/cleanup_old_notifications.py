@@ -13,23 +13,33 @@ class Command(BaseCommand):
         parser.add_argument(
             '--days',
             type=int,
-            default=30,
-            help='Delete notifications older than this many days (default: 30)'
+            default=0,
+            help='Delete notifications for episodes aired more than X days ago (default: 0 = delete immediately after airing)'
         )
 
     def handle(self, *args, **options):
         days = options['days']
         
-        self.stdout.write(self.style.NOTICE(f'Deleting notifications older than {days} days...'))
+        if days == 0:
+            self.stdout.write(self.style.NOTICE('Cleaning up: Cancel invalid notifications + Delete aired episodes immediately'))
+        else:
+            self.stdout.write(self.style.NOTICE(f'Cleaning up: Cancel invalid notifications + Delete episodes aired >{days} days ago'))
         
         notification_service = AnimeNotificationService()
         result = notification_service.cleanup_old_notifications(days=days)
         
+        cancelled = result.get('cancelled', 0)
         deleted = result.get('deleted', 0)
+        
+        if cancelled > 0:
+            self.stdout.write(
+                self.style.WARNING(f'⚠ Cancelled {cancelled} invalid pending notifications')
+            )
         
         if deleted > 0:
             self.stdout.write(
                 self.style.SUCCESS(f'✓ Deleted {deleted} old notifications')
             )
-        else:
-            self.stdout.write(self.style.NOTICE('No old notifications to delete'))
+        
+        if cancelled == 0 and deleted == 0:
+            self.stdout.write(self.style.NOTICE('✓ Nothing to clean up'))

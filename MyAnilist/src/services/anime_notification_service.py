@@ -276,7 +276,7 @@ class AnimeNotificationService:
 
     def cleanup_old_notifications(self, days: int = 30) -> Dict[str, Any]:
         """
-        Delete old notifications.
+        Delete old notifications and cancel invalid ones.
 
         Args:
             days: Delete notifications older than this many days
@@ -284,12 +284,17 @@ class AnimeNotificationService:
         Returns:
             Dictionary with cleanup results
         """
+        # First, cancel invalid pending notifications
+        cancelled_count = self.notification_repo.cancel_invalid_notifications()
+        
+        # Then, delete old notifications
         deleted_count = self.notification_repo.delete_old_notifications(days)
         
-        logger.info(f"Deleted {deleted_count} old notifications (older than {days} days)")
+        logger.info(f"Cancelled {cancelled_count} invalid notifications, deleted {deleted_count} old notifications")
         
         return {
             'success': True,
+            'cancelled': cancelled_count,
             'deleted': deleted_count,
-            'message': f'Deleted {deleted_count} old notifications'
+            'message': f'Cancelled {cancelled_count} invalid notifications, deleted {deleted_count} old notifications'
         }
