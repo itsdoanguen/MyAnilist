@@ -226,7 +226,8 @@ class AnimeNotificationService:
 
     def get_user_notifications(self, user, status: str = None, limit: int = 50) -> List[Dict[str, Any]]:
         """
-        Get user's scheduled notifications.
+        Get user's scheduled notifications with anime titles.
+        Uses batch fetching to reduce API calls.
 
         Args:
             user: User instance
@@ -234,15 +235,38 @@ class AnimeNotificationService:
             limit: Maximum number to return
 
         Returns:
-            List of notification dictionaries
+            List of notification dictionaries with anime information
         """
         notifications = self.notification_repo.get_user_notifications(user, status, limit)
         
+        if not notifications:
+            return []
+        
+        # Collect unique anime IDs
+        anime_ids = list(set(n.anilist_id for n in notifications))
+        logger.info(f"Fetching titles for {len(anime_ids)} unique anime: {anime_ids}")
+        
+        # Batch fetch anime titles
+        anime_data_map = {}
+        try:
+            anime_data_map = self.anime_repo.fetch_anime_batch(anime_ids)
+            logger.info(f"Batch fetch returned {len(anime_data_map)} anime: {list(anime_data_map.keys())}")
+        except Exception as e:
+            logger.error(f"Failed to batch fetch anime titles: {e}", exc_info=True)
+        
+        # Build result with anime titles
         result = []
         for notification in notifications:
+            anime_data = anime_data_map.get(notification.anilist_id, {})
+            anime_title = anime_data.get('title', {}).get('romaji', None) if anime_data else None
+            
+            if not anime_title:
+                logger.warning(f"No title found for anime {notification.anilist_id}. Data: {anime_data}")
+            
             result.append({
                 'notification_id': notification.notification_id,
                 'anilist_id': notification.anilist_id,
+                'anime_title': anime_title,
                 'episode_number': notification.episode_number,
                 'airing_at': notification.airing_at.isoformat(),
                 'notify_at': notification.notify_at.isoformat(),
