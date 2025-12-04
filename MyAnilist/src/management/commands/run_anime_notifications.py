@@ -36,7 +36,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--cleanup-days',
             type=int,
-            default=30,
+            default=1,
             help='Delete notifications older than this many days'
         )
 

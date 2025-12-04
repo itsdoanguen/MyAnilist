@@ -149,10 +149,15 @@ class AnimeNotificationRepository:
     @staticmethod
     def delete_old_notifications(days: int = 30):
         """
-        Delete notifications older than specified days.
+        Delete notifications for episodes that have already aired.
+        
+        Deletes notifications where:
+        - airing_at (episode air date) is in the past
+        - Optional: Keep recent notifications within 'days' parameter
 
         Args:
-            days: Number of days
+            days: Keep notifications for episodes aired within this many days (default 30)
+                  Set to 0 to delete all aired episodes immediately
 
         Returns:
             Number of deleted notifications
@@ -161,7 +166,7 @@ class AnimeNotificationRepository:
         
         cutoff_date = timezone.now() - timezone.timedelta(days=days)
         deleted_count = AnimeAiringNotification.objects.filter(
-            created_at__lt=cutoff_date
+            airing_at__lt=cutoff_date
         ).delete()[0]
         return deleted_count
 
@@ -172,7 +177,8 @@ class AnimeNotificationRepository:
         
         Returns users who have:
         1. AnimeFollow with notify_email set (not empty)
-        2. Either have AnimeNotificationPreference enabled, OR don't have preference (use defaults)
+        2. watch_status = 'watching' (only currently watching anime)
+        3. Either have AnimeNotificationPreference enabled, OR don't have preference (use defaults)
 
         Returns:
             QuerySet of (user_id, anilist_id, notify_before_hours) tuples
@@ -186,10 +192,11 @@ class AnimeNotificationRepository:
             Q(enabled=False) | Q(notify_by_email=False)
         ).values_list('user_id', flat=True)
         
-        # Get all follows with notify_email set, excluding disabled users
+        # Get follows with notify_email set, watch_status='watching', excluding disabled users
         # For users without preference, notify_before_hours will be None (will use default 24h)
         return AnimeFollow.objects.filter(
-            ~Q(notify_email='')
+            ~Q(notify_email=''),
+            watch_status='watching'
         ).exclude(
             user_id__in=disabled_users
         ).values_list('user_id', 'anilist_id', 'user__anime_notification_preference__notify_before_hours')
